@@ -55,6 +55,36 @@ body {
   --header-h: 56px;
 }
 
+/* ── Dark theme ─────────────────────────────────────────── */
+[data-theme="dark"] {
+  --bg: #1C1C1E;
+  --surface: #2C2C2E;
+  --border: #3A3A3C;
+  --border-strong: #48484A;
+  --text: #F2F2F7;
+  --muted: #8E8E93;
+  --hint: #636366;
+
+  --accent-soft: #1C3A6E;
+  --accent-mid: #1D4ED8;
+  --accent-dark: #93C5FD;
+
+  --green-soft: #052E16;
+  --green-dark: #4ADE80;
+
+  --amber-soft: #422006;
+  --amber-dark: #FCD34D;
+
+  --red-soft: #450A0A;
+  --red-dark: #FCA5A5;
+
+  --purple-soft: #1E1035;
+  --purple-dark: #C4B5FD;
+}
+
+[data-theme="dark"] body { background: #000; }
+[data-theme="dark"] .page { box-shadow: 0 0 40px rgba(0,0,0,0.6); }
+
 /* ── Typography ────────────────────────────────────────── */
 h1 { font-size: 24px; font-weight: 500; line-height: 1.2; }
 h2 { font-size: 20px; font-weight: 500; line-height: 1.3; }

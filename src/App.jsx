@@ -19,6 +19,11 @@ export default function App() {
   const { user, setUser, fetchSpaces, fetchAll } = useStore()
 
   useEffect(() => {
+    const saved = localStorage.getItem('memora-theme') || 'light'
+    document.documentElement.setAttribute('data-theme', saved)
+  }, [])
+
+  useEffect(() => {
     // Restore session on load
     supabase.auth.getSession().then(({ data: { session } }) => {
       setUser(session?.user ?? null)

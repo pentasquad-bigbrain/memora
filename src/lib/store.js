@@ -214,6 +214,14 @@ export const useStore = create((set, get) => ({
     if (!error) set(s => ({ ideas: s.ideas.map(i => i.id === id ? { ...i, ...updates } : i) }))
     return { error }
   },
+  deleteSpace: async (id) => {
+    const { error } = await supabase.from('spaces').delete().eq('id', id)
+    if (!error) set(s => {
+      const spaces = s.spaces.filter(sp => sp.id !== id)
+      return { spaces, activeSpace: s.activeSpace?.id === id ? (spaces[0] || null) : s.activeSpace }
+    })
+    return { error }
+  },
 
   // ── Journal ───────────────────────────────────────────────
   fetchJournalEntry: async (date) => {

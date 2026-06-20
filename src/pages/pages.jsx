@@ -219,6 +219,9 @@ function VaultItemModal({ item, onClose, onDelete, onUpdate }) {
   )
 }
 
+const VAULT_PRESET_TAGS = ['work','personal','finance','health','family','learning','travel','reference','receipt','document']
+const isGenericTitle = (t) => !t || /^image\d*$/i.test(t) || /^img/i.test(t) || /^photo/i.test(t) || /^screenshot/i.test(t) || /\.[a-z]{3,4}$/.test(t)
+
 // Add to Vault modal with AI image analysis
 function AddVaultModal({ onClose, onSave }) {
   const [tab, setTab]         = useState('text')
@@ -227,6 +230,7 @@ function AddVaultModal({ onClose, onSave }) {
   // text
   const [title, setTitle]     = useState('')
   const [body, setBody]       = useState('')
+  const [selectedTags, setSelectedTags] = useState([])
 
   // image — AI powered
   const [imgPreview, setImgPreview] = useState(null)
@@ -235,7 +239,10 @@ function AddVaultModal({ onClose, onSave }) {
   const [imgDesc, setImgDesc]       = useState('')
   const [analyzing, setAnalyzing]   = useState(false)
   const [analyzed, setAnalyzed]     = useState(false)
+  const [needsContext, setNeedsContext] = useState(false)
   const fileRef = useRef(null)
+
+  const toggleTag = (tag) => setSelectedTags(prev => prev.includes(tag) ? prev.filter(t=>t!==tag) : [...prev, tag])
 
   // audio
   const [recording, setRecording]   = useState(false)
@@ -259,8 +266,12 @@ function AddVaultModal({ onClose, onSave }) {
         setImgTitle(analysis.title || file.name.replace(/\.[^.]+$/, ''))
         setImgDesc(analysis.summary || '')
         setAnalyzed(true)
+        const lowConf = !analysis.confidence || analysis.confidence < 0.45
+        const genericName = isGenericTitle(analysis.title)
+        setNeedsContext(lowConf || genericName)
       } catch {
         setAnalyzed(false)
+        setNeedsContext(true)
       } finally {
         setAnalyzing(false)
       }
@@ -280,18 +291,21 @@ function AddVaultModal({ onClose, onSave }) {
   const formatTime = (s) => `${String(Math.floor(s / 60)).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`
 
   const handleSave = async () => {
+    if (needsContext && tab === 'image' && !imgDesc.trim()) {
+      return
+    }
     setSaving(true)
     if (tab === 'text') {
-      await onSave({ title: title.trim() || 'Note', ocr_text: body.trim() || null, type: 'note', tags: [] })
+      await onSave({ title: title.trim() || 'Note', ocr_text: body.trim() || null, type: 'note', tags: selectedTags })
     } else if (tab === 'image') {
-      await onSave({ title: imgTitle.trim() || 'Image', file_url: imgPreview, ocr_text: imgDesc || null, type: 'image', tags: [] })
+      await onSave({ title: imgTitle.trim() || 'Image', file_url: imgPreview, ocr_text: imgDesc || null, type: 'image', tags: selectedTags })
     } else {
-      await onSave({ title: audioTitle.trim() || `Voice note · ${format(new Date(), 'h:mm a')}`, ocr_text: transcript || null, type: 'note', tags: ['voice'] })
+      await onSave({ title: audioTitle.trim() || `Voice note · ${format(new Date(), 'h:mm a')}`, ocr_text: transcript || null, type: 'note', tags: ['voice', ...selectedTags] })
     }
     setSaving(false); onClose()
   }
 
-  const canSave = tab === 'text' ? !!title.trim() : tab === 'image' ? !!imgPreview : !!transcript
+  const canSave = tab === 'text' ? !!title.trim() : tab === 'image' ? (!!imgPreview && (!needsContext || !!imgDesc.trim())) : !!transcript
 
   return (
     <div style={{ position: 'fixed', inset: 0, zIndex: 300, display: 'flex', flexDirection: 'column', justifyContent: 'flex-end', background: 'rgba(0,0,0,0.45)' }} onClick={onClose}>
@@ -312,7 +326,15 @@ function AddVaultModal({ onClose, onSave }) {
           {tab === 'text' && (
             <>
               <input className="input" placeholder="Title" value={title} onChange={e => setTitle(e.target.value)} style={{ marginBottom: 10 }} autoFocus />
-              <textarea className="input" placeholder="Content (optional)" value={body} onChange={e => setBody(e.target.value)} style={{ minHeight: 100 }} />
+              <textarea className="input" placeholder="Content (optional)" value={body} onChange={e => setBody(e.target.value)} style={{ minHeight: 100, marginBottom: 10 }} />
+              <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: .4, marginBottom: 8 }}>Tags</div>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                {VAULT_PRESET_TAGS.map(tag => (
+                  <button key={tag} onClick={() => toggleTag(tag)} style={{ padding: '4px 12px', borderRadius: 20, fontSize: 12, fontWeight: 500, border: '1px solid', cursor: 'pointer', fontFamily: 'inherit', background: selectedTags.includes(tag) ? 'var(--accent)' : 'transparent', color: selectedTags.includes(tag) ? '#fff' : 'var(--muted)', borderColor: selectedTags.includes(tag) ? 'var(--accent)' : 'var(--border)' }}>
+                    {tag}
+                  </button>
+                ))}
+              </div>
             </>
           )}
 
@@ -338,14 +360,31 @@ function AddVaultModal({ onClose, onSave }) {
                 </div>
               )}
 
-              {analyzed && (
+              {analyzed && !needsContext && (
                 <div style={{ background: 'var(--accent-soft)', borderRadius: 'var(--r-sm)', padding: '8px 12px', fontSize: 12, color: 'var(--accent-dark)', marginBottom: 10, display: 'flex', gap: 6, alignItems: 'center' }}>
                   <i className="ti ti-sparkles" style={{ fontSize: 13 }} /> AI analyzed · you can edit below
                 </div>
               )}
 
+              {needsContext && analyzed && (
+                <div style={{ background: 'var(--amber-soft)', border: '1.5px solid var(--amber)', borderRadius: 'var(--r-sm)', padding: '10px 12px', marginBottom: 10 }}>
+                  <div style={{ fontSize: 12, color: 'var(--amber-dark)', fontWeight: 600, marginBottom: 4, display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <i className="ti ti-help-circle" style={{ fontSize: 14 }} /> What is this image about?
+                  </div>
+                  <div style={{ fontSize: 11, color: 'var(--amber-dark)', opacity: .8 }}>AI couldn't fully understand this image. Please describe it below.</div>
+                </div>
+              )}
+
               <input className="input" placeholder="Title" value={imgTitle} onChange={e => setImgTitle(e.target.value)} style={{ marginBottom: 10 }} />
-              <textarea className="input" placeholder="Description (auto-filled by AI)" value={imgDesc} onChange={e => setImgDesc(e.target.value)} style={{ minHeight: 70 }} />
+              <textarea className="input" placeholder={needsContext ? 'Describe what this image is about (required)…' : 'Description (auto-filled by AI)'} value={imgDesc} onChange={e => setImgDesc(e.target.value)} style={{ minHeight: 70, marginBottom: 10, borderColor: needsContext && !imgDesc.trim() ? 'var(--amber)' : undefined }} />
+              <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: .4, marginBottom: 8 }}>Tags</div>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                {VAULT_PRESET_TAGS.map(tag => (
+                  <button key={tag} onClick={() => toggleTag(tag)} style={{ padding: '4px 12px', borderRadius: 20, fontSize: 12, fontWeight: 500, border: '1px solid', cursor: 'pointer', fontFamily: 'inherit', background: selectedTags.includes(tag) ? 'var(--accent)' : 'transparent', color: selectedTags.includes(tag) ? '#fff' : 'var(--muted)', borderColor: selectedTags.includes(tag) ? 'var(--accent)' : 'var(--border)' }}>
+                    {tag}
+                  </button>
+                ))}
+              </div>
             </>
           )}
 
@@ -649,7 +688,19 @@ export function Journal() {
   // ── Save all entries + images + summary ──────────
   const handleSave = async () => {
     setSaving(true)
-    const { error } = await saveJournalEntry({ date: dateStr, personalNote: null, autoSummary: aiSummary, journalImages, logEntries })
+    let summary = aiSummary
+    if (logEntries.length > 0 && !aiSummary) {
+      setGenerating(true)
+      try {
+        summary = await generateJournalSummary({ tasksCompleted: dayDone, ideasCaptured: dayIdeas, expenses: dayExpenses, captures: dayCaptures, logEntries })
+        setAiSummary(summary)
+        if (summary?.suggested_tasks?.length) {
+          const init = {}; summary.suggested_tasks.forEach(t => { init[t] = false }); setPromotedTasks(init)
+        }
+      } catch { /* keep null */ }
+      finally { setGenerating(false) }
+    }
+    const { error } = await saveJournalEntry({ date: dateStr, personalNote: null, autoSummary: summary, journalImages, logEntries })
     setSaving(false)
     if (!error) showToast('Journal saved')
     else showToast('Save failed')
@@ -657,11 +708,8 @@ export function Journal() {
 
   return (
     <div className="page">
-      <div style={{ padding: '14px 16px 0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+      <div style={{ padding: '14px 16px 0' }}>
         <h2>Journal</h2>
-        <button className="btn btn-ghost" style={{ fontSize: 13, padding: '6px 14px' }} onClick={handleSave} disabled={saving}>
-          {saving ? 'Saving…' : 'Save'}
-        </button>
       </div>
 
       {/* Week strip */}
@@ -696,91 +744,6 @@ export function Journal() {
             </div>
           ))}
         </div>
-
-        {/* AI Summary */}
-        {aiSummary ? (
-          <>
-            <div className="section-row" style={{ marginTop: 20 }}>
-              <div className="section-label" style={{ margin: 0 }}>AI Summary</div>
-              <button style={{ background: 'none', border: 'none', fontSize: 12, color: 'var(--accent)', cursor: 'pointer' }} onClick={handleGenerate}>Regenerate</button>
-            </div>
-            <div className="card">
-              {aiSummary.headline && <div style={{ fontSize: 14, fontWeight: 500, marginBottom: 10 }}>{aiSummary.headline}</div>}
-              {aiSummary.highlights?.map((h, i) => (
-                <div key={i} style={{ display: 'flex', gap: 8, alignItems: 'flex-start', marginBottom: 6 }}>
-                  <i className="ti ti-circle-check" style={{ fontSize: 14, color: 'var(--green)', marginTop: 1, flexShrink: 0 }} />
-                  <div style={{ fontSize: 13, color: 'var(--muted)', lineHeight: 1.5 }}>{h}</div>
-                </div>
-              ))}
-            </div>
-
-            {/* Suggested tasks — user must CHECK to promote, never auto-saved */}
-            {aiSummary.suggested_tasks?.length > 0 && (
-              <>
-                <div className="section-row" style={{ marginTop: 16 }}>
-                  <div style={{ fontSize: 11, fontWeight: 600, textTransform: 'uppercase', letterSpacing: .5, color: 'var(--muted)' }}>
-                    AI suggested tasks
-                  </div>
-                  <span style={{ fontSize: 10, color: 'var(--hint)' }}>check to add to Tasks</span>
-                </div>
-                <div className="card" style={{ padding: '4px 16px' }}>
-                  {aiSummary.suggested_tasks.map((t, i) => (
-                    <label key={i} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 0', borderBottom: i < aiSummary.suggested_tasks.length - 1 ? '1px solid var(--border)' : 'none', cursor: 'pointer' }}>
-                      <input
-                        type="checkbox"
-                        checked={!!promotedTasks[t]}
-                        onChange={e => setPromotedTasks(prev => ({ ...prev, [t]: e.target.checked }))}
-                        style={{ accentColor: 'var(--accent)', width: 16, height: 16, flexShrink: 0 }}
-                      />
-                      <span style={{ fontSize: 13 }}>{t}</span>
-                    </label>
-                  ))}
-                </div>
-                {Object.values(promotedTasks).some(Boolean) && (
-                  <button className="btn btn-primary" style={{ width: '100%', marginTop: 8, gap: 6 }} onClick={handlePromoteTasks} disabled={promotingSaving}>
-                    {promotingSaving
-                      ? <><div className="spinner" style={{ width: 12, height: 12, borderTopColor: '#fff' }} /> Adding…</>
-                      : <><i className="ti ti-plus" style={{ fontSize: 14 }} /> Add {Object.values(promotedTasks).filter(Boolean).length} to Tasks</>
-                    }
-                  </button>
-                )}
-              </>
-            )}
-          </>
-        ) : (
-          <>
-            <div className="section-label" style={{ marginTop: 20 }}>AI Summary</div>
-            {generating ? (
-              <div style={{ background: 'var(--accent-soft)', border: '1px solid var(--accent-mid)', borderRadius: 'var(--r)', padding: '18px 16px' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 16 }}>
-                  <div className="spinner" style={{ width: 18, height: 18 }} />
-                  <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--accent)' }}>Preparing your AI summary</div>
-                </div>
-                {[
-                  { done: true,  label: 'Reviewing your journal entries' },
-                  { done: true,  label: 'Scanning vault items' },
-                  { done: false, label: 'Cleaning clutter' },
-                  { done: false, label: 'Generating summary' },
-                ].map((step, i) => (
-                  <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '6px 0' }}>
-                    {step.done
-                      ? <i className="ti ti-circle-check" style={{ fontSize: 16, color: 'var(--green)', flexShrink: 0 }} />
-                      : <div style={{ width: 16, height: 16, borderRadius: '50%', border: '2px solid var(--border-strong)', flexShrink: 0 }} />}
-                    <div>
-                      <div style={{ fontSize: 13, color: step.done ? 'var(--text)' : 'var(--muted)' }}>{step.label}</div>
-                      {!step.done && i === 2 && <div style={{ fontSize: 11, color: 'var(--hint)' }}>Sorting and removing duplicates</div>}
-                      {!step.done && i === 3 && <div style={{ fontSize: 11, color: 'var(--hint)' }}>Almost there…</div>}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <button className="btn btn-ghost" style={{ width: '100%', gap: 8 }} onClick={handleGenerate}>
-                <i className="ti ti-sparkles" style={{ fontSize: 16 }} /> Generate AI Summary
-              </button>
-            )}
-          </>
-        )}
 
         {/* ── Log Entries ── */}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 20, marginBottom: 10 }}>
@@ -890,9 +853,79 @@ export function Journal() {
           </div>
         )}
 
-        <button className="btn btn-primary" style={{ width: '100%', marginTop: 12 }} onClick={handleSave} disabled={saving}>
-          {saving ? 'Saving…' : `Save journal${logEntries.length > 0 ? ` · ${logEntries.length} entr${logEntries.length > 1 ? 'ies' : 'y'}` : ''}`}
+        <button className="btn btn-primary" style={{ width: '100%', marginTop: 12, gap: 8 }} onClick={handleSave} disabled={saving || generating}>
+          {(saving || generating)
+            ? <><div className="spinner" style={{ width: 14, height: 14, borderTopColor: '#fff' }} /> {generating ? 'Generating summary…' : 'Saving…'}</>
+            : <><i className="ti ti-device-floppy" style={{ fontSize: 15 }} /> Save journal · {format(selectedDate, 'd MMM')}</>
+          }
         </button>
+
+        {/* AI Summary — auto-generated on save */}
+        {aiSummary ? (
+          <>
+            <div className="section-row" style={{ marginTop: 20 }}>
+              <div className="section-label" style={{ margin: 0 }}>AI Summary</div>
+              <button style={{ background: 'none', border: 'none', fontSize: 12, color: 'var(--accent)', cursor: 'pointer' }} onClick={handleGenerate}>Regenerate</button>
+            </div>
+            <div className="card">
+              {aiSummary.headline && <div style={{ fontSize: 14, fontWeight: 500, marginBottom: 10 }}>{aiSummary.headline}</div>}
+              {aiSummary.highlights?.map((h, i) => (
+                <div key={i} style={{ display: 'flex', gap: 8, alignItems: 'flex-start', marginBottom: 6 }}>
+                  <i className="ti ti-circle-check" style={{ fontSize: 14, color: 'var(--green)', marginTop: 1, flexShrink: 0 }} />
+                  <div style={{ fontSize: 13, color: 'var(--muted)', lineHeight: 1.5 }}>{h}</div>
+                </div>
+              ))}
+            </div>
+            {aiSummary.suggested_tasks?.length > 0 && (
+              <>
+                <div className="section-row" style={{ marginTop: 16 }}>
+                  <div style={{ fontSize: 11, fontWeight: 600, textTransform: 'uppercase', letterSpacing: .5, color: 'var(--muted)' }}>AI suggested tasks</div>
+                  <span style={{ fontSize: 10, color: 'var(--hint)' }}>check to add to Tasks</span>
+                </div>
+                <div className="card" style={{ padding: '4px 16px' }}>
+                  {aiSummary.suggested_tasks.map((t, i) => (
+                    <label key={i} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 0', borderBottom: i < aiSummary.suggested_tasks.length - 1 ? '1px solid var(--border)' : 'none', cursor: 'pointer' }}>
+                      <input type="checkbox" checked={!!promotedTasks[t]} onChange={e => setPromotedTasks(prev => ({ ...prev, [t]: e.target.checked }))} style={{ accentColor: 'var(--accent)', width: 16, height: 16, flexShrink: 0 }} />
+                      <span style={{ fontSize: 13 }}>{t}</span>
+                    </label>
+                  ))}
+                </div>
+                {Object.values(promotedTasks).some(Boolean) && (
+                  <button className="btn btn-primary" style={{ width: '100%', marginTop: 8, gap: 6 }} onClick={handlePromoteTasks} disabled={promotingSaving}>
+                    {promotingSaving
+                      ? <><div className="spinner" style={{ width: 12, height: 12, borderTopColor: '#fff' }} /> Adding…</>
+                      : <><i className="ti ti-plus" style={{ fontSize: 14 }} /> Add {Object.values(promotedTasks).filter(Boolean).length} to Tasks</>
+                    }
+                  </button>
+                )}
+              </>
+            )}
+          </>
+        ) : generating ? (
+          <div style={{ background: 'var(--accent-soft)', border: '1px solid var(--accent-mid)', borderRadius: 'var(--r)', padding: '18px 16px', marginTop: 16 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 16 }}>
+              <div className="spinner" style={{ width: 18, height: 18 }} />
+              <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--accent)' }}>Preparing your AI summary</div>
+            </div>
+            {[
+              { done: true,  label: 'Reviewing your journal entries' },
+              { done: true,  label: 'Scanning vault items' },
+              { done: false, label: 'Cleaning clutter' },
+              { done: false, label: 'Generating summary' },
+            ].map((step, i) => (
+              <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '6px 0' }}>
+                {step.done
+                  ? <i className="ti ti-circle-check" style={{ fontSize: 16, color: 'var(--green)', flexShrink: 0 }} />
+                  : <div style={{ width: 16, height: 16, borderRadius: '50%', border: '2px solid var(--border-strong)', flexShrink: 0 }} />}
+                <div>
+                  <div style={{ fontSize: 13, color: step.done ? 'var(--text)' : 'var(--muted)' }}>{step.label}</div>
+                  {!step.done && i === 2 && <div style={{ fontSize: 11, color: 'var(--hint)' }}>Sorting and removing duplicates</div>}
+                  {!step.done && i === 3 && <div style={{ fontSize: 11, color: 'var(--hint)' }}>Almost there…</div>}
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : null}
       </div>
 
       {toast && <div className="toast">{toast}</div>}

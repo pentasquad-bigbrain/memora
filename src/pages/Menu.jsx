@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useStore } from '../lib/store'
 import { supabase } from '../lib/supabase'
@@ -20,10 +21,28 @@ const MENU_ITEMS = [
 
 export default function Menu() {
   const navigate = useNavigate()
-  const { user, spaces, activeSpace, setActiveSpace } = useStore()
+  const { user, spaces, activeSpace, setActiveSpace, deleteSpace } = useStore()
+  const [theme, setTheme] = useState(() => localStorage.getItem('memora-theme') || 'light')
+  const [deleteConfirm, setDeleteConfirm] = useState(null)
+  const [deleting, setDeleting] = useState(false)
+
   const firstName = user?.user_metadata?.full_name?.split(' ')[0] || 'there'
   const fullName  = user?.user_metadata?.full_name || firstName
   const email     = user?.email || ''
+
+  const toggleTheme = () => {
+    const next = theme === 'light' ? 'dark' : 'light'
+    setTheme(next)
+    localStorage.setItem('memora-theme', next)
+    document.documentElement.setAttribute('data-theme', next)
+  }
+
+  const handleDeleteSpace = async (id) => {
+    setDeleting(true)
+    await deleteSpace(id)
+    setDeleting(false)
+    setDeleteConfirm(null)
+  }
 
   const handleLogout = async () => {
     await supabase.auth.signOut()
@@ -38,7 +57,14 @@ export default function Menu() {
           <i className="ti ti-arrow-left" style={{ fontSize:20 }} />
         </button>
         <div style={{ fontSize:16, fontWeight:600 }}>Menu</div>
-        <div style={{ width:28 }} />
+        {/* Theme toggle */}
+        <button
+          onClick={toggleTheme}
+          style={{ width:36, height:36, borderRadius:'50%', border:'1px solid var(--border)', background:'var(--bg)', cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', color:'var(--muted)' }}
+          title={theme === 'light' ? 'Switch to dark mode' : 'Switch to light mode'}
+        >
+          <i className={`ti ${theme === 'light' ? 'ti-moon' : 'ti-sun'}`} style={{ fontSize:18 }} />
+        </button>
       </div>
 
       <div className="page-scroll" style={{ paddingBottom:32 }}>
@@ -47,23 +73,70 @@ export default function Menu() {
           <div className={`avatar avatar-lg ${avatarColor(firstName)}`} style={{ flexShrink:0 }}>
             {initials(fullName)}
           </div>
-          <div>
+          <div style={{ flex:1 }}>
             <div style={{ fontSize:18, fontWeight:700 }}>{fullName}</div>
             <div style={{ fontSize:13, color:'var(--muted)', marginTop:2 }}>{email}</div>
           </div>
         </div>
 
+        {/* Theme toggle row (also visible inline) */}
+        <div style={{ background:'var(--bg)', borderRadius:'var(--r)', border:'1px solid var(--border)', padding:'12px 16px', display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:16 }}>
+          <div style={{ display:'flex', alignItems:'center', gap:10 }}>
+            <div style={{ width:32, height:32, borderRadius:8, background: theme==='dark' ? 'var(--purple-soft)' : 'var(--amber-soft)', display:'flex', alignItems:'center', justifyContent:'center' }}>
+              <i className={`ti ${theme==='dark' ? 'ti-moon' : 'ti-sun'}`} style={{ fontSize:16, color: theme==='dark' ? 'var(--purple-dark)' : 'var(--amber-dark)' }} />
+            </div>
+            <div>
+              <div style={{ fontSize:14, fontWeight:500 }}>{theme==='dark' ? 'Dark mode' : 'Light mode'}</div>
+              <div style={{ fontSize:11, color:'var(--muted)' }}>Tap to switch theme</div>
+            </div>
+          </div>
+          <button
+            onClick={toggleTheme}
+            style={{ width:44, height:24, borderRadius:12, border:'none', cursor:'pointer', position:'relative', background: theme==='dark' ? 'var(--accent)' : 'var(--border-strong)', transition:'background .2s', flexShrink:0 }}
+          >
+            <div style={{ position:'absolute', top:3, left: theme==='dark' ? 22 : 3, width:18, height:18, borderRadius:'50%', background:'#fff', transition:'left .2s', boxShadow:'0 1px 3px rgba(0,0,0,0.3)' }} />
+          </button>
+        </div>
+
         {/* Spaces */}
-        <div className="section-label" style={{ marginTop:16 }}>Spaces</div>
+        <div className="section-label" style={{ marginTop:8 }}>Spaces</div>
         <div style={{ background:'var(--bg)', borderRadius:'var(--r)', border:'1px solid var(--border)', overflow:'hidden' }}>
           {spaces.map((sp,i) => (
-            <button key={sp.id} onClick={()=>{setActiveSpace(sp);navigate('/')}} style={{ display:'flex', alignItems:'center', gap:12, width:'100%', padding:'14px 16px', background:'none', border:'none', borderBottom: i<spaces.length-1?'1px solid var(--border)':'none', cursor:'pointer', fontFamily:'inherit', textAlign:'left' }}>
-              <div style={{ width:32, height:32, borderRadius:8, background:'var(--accent-soft)', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>
-                <i className={`ti ${SPACE_ICONS[i%SPACE_ICONS.length]}`} style={{ fontSize:16, color:'var(--accent)' }} />
-              </div>
-              <span style={{ flex:1, fontSize:15, fontWeight:500, color:'var(--text)' }}>{sp.name}</span>
-              {activeSpace?.id===sp.id && <i className="ti ti-check" style={{ fontSize:16, color:'var(--accent)' }} />}
-            </button>
+            <div key={sp.id} style={{ display:'flex', alignItems:'center', borderBottom: i<spaces.length-1?'1px solid var(--border)':'none' }}>
+              <button onClick={()=>{setActiveSpace(sp);navigate('/')}} style={{ display:'flex', alignItems:'center', gap:12, flex:1, padding:'14px 16px', background:'none', border:'none', cursor:'pointer', fontFamily:'inherit', textAlign:'left', minWidth:0 }}>
+                <div style={{ width:32, height:32, borderRadius:8, background:'var(--accent-soft)', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>
+                  <i className={`ti ${SPACE_ICONS[i%SPACE_ICONS.length]}`} style={{ fontSize:16, color:'var(--accent)' }} />
+                </div>
+                <span style={{ flex:1, fontSize:15, fontWeight:500, color:'var(--text)', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{sp.name}</span>
+                {activeSpace?.id===sp.id && <i className="ti ti-check" style={{ fontSize:16, color:'var(--accent)', flexShrink:0 }} />}
+              </button>
+
+              {/* Delete space */}
+              {deleteConfirm === sp.id ? (
+                <div style={{ display:'flex', gap:6, padding:'0 10px', flexShrink:0 }}>
+                  <button
+                    onClick={() => handleDeleteSpace(sp.id)}
+                    disabled={deleting}
+                    style={{ padding:'6px 12px', borderRadius:20, border:'none', background:'var(--red)', color:'#fff', fontSize:12, fontWeight:600, cursor:'pointer', fontFamily:'inherit' }}
+                  >
+                    {deleting ? '…' : 'Delete'}
+                  </button>
+                  <button
+                    onClick={() => setDeleteConfirm(null)}
+                    style={{ padding:'6px 12px', borderRadius:20, border:'1px solid var(--border)', background:'none', color:'var(--muted)', fontSize:12, cursor:'pointer', fontFamily:'inherit' }}
+                  >
+                    Cancel
+                  </button>
+                </div>
+              ) : (
+                <button
+                  onClick={() => setDeleteConfirm(sp.id)}
+                  style={{ width:36, height:36, borderRadius:'50%', border:'none', cursor:'pointer', background:'none', display:'flex', alignItems:'center', justifyContent:'center', color:'var(--hint)', marginRight:8, flexShrink:0 }}
+                >
+                  <i className="ti ti-trash" style={{ fontSize:15 }} />
+                </button>
+              )}
+            </div>
           ))}
           <button onClick={()=>navigate('/')} style={{ display:'flex', alignItems:'center', gap:12, width:'100%', padding:'14px 16px', background:'none', border:'none', cursor:'pointer', fontFamily:'inherit', textAlign:'left' }}>
             <div style={{ width:32, height:32, borderRadius:8, background:'var(--bg)', border:'1.5px dashed var(--border-strong)', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>

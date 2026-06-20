@@ -14,6 +14,7 @@ const TYPE_META = {
 }
 const ALL_TYPES = ['task','idea','expense','note','person']
 const CAPTURE_DEST = { task:'/tasks', idea:'/idealab', expense:'/vault', note:'/vault', person:'/people' }
+const PRESET_TAGS = ['work','personal','finance','health','family','learning','travel','urgent','idea','reference']
 
 function ResultCard({ result, onSave, onEdit, onDiscard, saving }) {
   const meta = TYPE_META[result.type]||TYPE_META.unknown
@@ -54,6 +55,8 @@ function EditForm({ result, transcript, onConfirm, onCancel }) {
   const [editAmount, setEditAmount] = useState(result.amount!=null?String(result.amount):'')
   const [editVendor, setEditVendor] = useState(result.vendor||'')
   const [editDue,    setEditDue]    = useState(result.due?new Date(result.due).toISOString().slice(0,16):'')
+  const [editTags,   setEditTags]   = useState(result.tags||[])
+  const toggleTag = (tag) => setEditTags(prev => prev.includes(tag) ? prev.filter(t=>t!==tag) : [...prev, tag])
   const meta = TYPE_META[editType]||TYPE_META.unknown
   return (
     <div style={{ border:'1px solid var(--border)', borderRadius:'var(--r)', overflow:'hidden' }}>
@@ -82,8 +85,19 @@ function EditForm({ result, transcript, onConfirm, onCancel }) {
             <input className="input" placeholder="₹ Amount" type="number" min="0" value={editAmount} onChange={e=>setEditAmount(e.target.value)} style={{ width:110 }} />
           </div>
         )}
+        {/* Tag multi-select */}
+        <div>
+          <div style={{ fontSize:11, fontWeight:600, color:'var(--muted)', textTransform:'uppercase', letterSpacing:.4, marginBottom:8 }}>Tags</div>
+          <div style={{ display:'flex', flexWrap:'wrap', gap:6 }}>
+            {PRESET_TAGS.map(tag=>(
+              <button key={tag} onClick={()=>toggleTag(tag)} style={{ padding:'4px 12px', borderRadius:20, fontSize:12, fontWeight:500, border:'1px solid', cursor:'pointer', fontFamily:'inherit', background:editTags.includes(tag)?'var(--accent)':'transparent', color:editTags.includes(tag)?'#fff':'var(--muted)', borderColor:editTags.includes(tag)?'var(--accent)':'var(--border)' }}>
+                {tag}
+              </button>
+            ))}
+          </div>
+        </div>
         <div style={{ display:'flex', gap:8 }}>
-          <button className="btn btn-primary" style={{ flex:1 }} onClick={()=>{ if(!editTitle.trim()) return; onConfirm({ type:editType, title:editTitle.trim(), body:editBody.trim()||null, person:editPerson.trim()||null, amount:editAmount?parseFloat(editAmount):null, vendor:editVendor.trim()||null, due:editDue||null }) }}>Confirm &amp; save</button>
+          <button className="btn btn-primary" style={{ flex:1 }} onClick={()=>{ if(!editTitle.trim()) return; onConfirm({ type:editType, title:editTitle.trim(), body:editBody.trim()||null, person:editPerson.trim()||null, amount:editAmount?parseFloat(editAmount):null, vendor:editVendor.trim()||null, due:editDue||null, tags:editTags }) }}>Confirm &amp; save</button>
           <button className="btn btn-ghost" onClick={onCancel}>Cancel</button>
         </div>
       </div>
@@ -351,8 +365,6 @@ export default function Capture() {
               {[
                 { icon:'ti-microphone', color:'var(--accent)', bg:'var(--accent-soft)', label:'Voice', action:()=>hasVoiceSupport?handleVoice():showToast('Voice not supported — use Chrome'), disabled:!hasVoiceSupport },
                 { icon:'ti-camera',     color:'var(--purple)', bg:'var(--purple-soft)', label:'Photo',  action:()=>setShowPhotoSheet(true), disabled:false },
-                { icon:'ti-file',       color:'var(--green)',  bg:'var(--green-soft)',  label:'File',   action:()=>setShowPhotoSheet(true), disabled:false },
-                { icon:'ti-sparkles',   color:'var(--amber)',  bg:'var(--amber-soft)',  label:'AI Parse', action:handleSubmit, disabled:!input.trim()||status==='parsing' },
               ].map(btn=>(
                 <div key={btn.label} style={{ display:'flex', flexDirection:'column', alignItems:'center', gap:6 }}>
                   <button onClick={btn.action} disabled={btn.disabled} style={{ width:56, height:56, borderRadius:'50%', background:btn.bg, border:'none', cursor:btn.disabled?'not-allowed':'pointer', display:'flex', alignItems:'center', justifyContent:'center', opacity:btn.disabled?.4:1, touchAction:'manipulation' }}>
