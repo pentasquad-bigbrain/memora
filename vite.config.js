@@ -4,6 +4,10 @@ import { VitePWA } from 'vite-plugin-pwa'
 
 export default defineConfig({
   base: '/memora/',
+  server: {
+    host: '0.0.0.0',
+    port: 5173,
+  },
   plugins: [
     react(),
     VitePWA({
