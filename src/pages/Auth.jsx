@@ -1,11 +1,28 @@
+import { useState } from 'react'
 import { supabase } from '../lib/supabase'
 
 export default function Auth() {
+  const [email, setEmail] = useState('')
+  const [password, setPassword] = useState('')
+  const [mode, setMode] = useState('sign-in') // 'sign-in' | 'sign-up'
+  const [error, setError] = useState('')
+  const [loading, setLoading] = useState(false)
+
   const handleGoogle = async () => {
     await supabase.auth.signInWithOAuth({
       provider: 'google',
       options: { redirectTo: `${window.location.origin}/memora/` }
     })
+  }
+
+  const handleEmailAuth = async (e) => {
+    e.preventDefault()
+    setError('')
+    setLoading(true)
+    const fn = mode === 'sign-in' ? 'signInWithPassword' : 'signUp'
+    const { error } = await supabase.auth[fn]({ email, password })
+    setLoading(false)
+    if (error) setError(error.message)
   }
 
   return (
@@ -37,7 +54,54 @@ export default function Auth() {
       </div>
 
       <div style={{ width: '100%', maxWidth: 320 }}>
-        <button className="btn btn-primary" style={{ width: '100%', fontSize: 15, padding: '14px' }} onClick={handleGoogle}>
+        <form onSubmit={handleEmailAuth}>
+          <input
+            className="input"
+            type="email"
+            placeholder="Email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            required
+            style={{ width: '100%', marginBottom: 10 }}
+          />
+          <input
+            className="input"
+            type="password"
+            placeholder="Password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            required
+            minLength={6}
+            style={{ width: '100%', marginBottom: 10 }}
+          />
+          {error && (
+            <p style={{ color: 'var(--red-dark)', fontSize: 13, marginBottom: 10 }}>{error}</p>
+          )}
+          <button
+            className="btn btn-primary"
+            type="submit"
+            disabled={loading}
+            style={{ width: '100%', fontSize: 15, padding: '14px' }}
+          >
+            {loading ? 'Please wait…' : mode === 'sign-in' ? 'Sign in' : 'Create account'}
+          </button>
+        </form>
+
+        <p style={{ textAlign: 'center', fontSize: 13, marginTop: 14 }}>
+          {mode === 'sign-in' ? (
+            <>No account? <a onClick={() => setMode('sign-up')} style={{ color: 'var(--accent)', cursor: 'pointer' }}>Sign up</a></>
+          ) : (
+            <>Already have an account? <a onClick={() => setMode('sign-in')} style={{ color: 'var(--accent)', cursor: 'pointer' }}>Sign in</a></>
+          )}
+        </p>
+
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, margin: '20px 0' }}>
+          <div style={{ flex: 1, height: 1, background: 'var(--border)' }} />
+          <span style={{ color: 'var(--muted)', fontSize: 12 }}>or</span>
+          <div style={{ flex: 1, height: 1, background: 'var(--border)' }} />
+        </div>
+
+        <button className="btn btn-ghost" style={{ width: '100%', fontSize: 15, padding: '14px' }} onClick={handleGoogle}>
           <i className="ti ti-brand-google" style={{ fontSize: 18 }}></i>
           Continue with Google
         </button>

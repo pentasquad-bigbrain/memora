@@ -164,5 +164,87 @@ export const useStore = create((set, get) => ({
     }).select().single()
     if (!error) set((s) => ({ vaultItems: [data, ...s.vaultItems] }))
     return { data, error }
+  },
+
+  // ── People (extended) ────────────────────────────────────
+  findOrCreatePerson: async (name) => {
+    const trimmed = name.trim()
+    const { people } = get()
+    const existing = people.find(p => p.name.toLowerCase() === trimmed.toLowerCase())
+    if (existing) return existing
+    const { data } = await get().addPerson({ name: trimmed, role: 'other' })
+    return data
+  },
+
+  // ── Spaces ────────────────────────────────────────────────
+  addSpace: async (name) => {
+    const { user } = get()
+    const { data, error } = await supabase.from('spaces').insert({
+      name,
+      user_id: user.id,
+      type: 'custom'
+    }).select().single()
+    if (!error) set((s) => ({ spaces: [...s.spaces, data] }))
+    return { data, error }
+  },
+
+  // ── Deletes ───────────────────────────────────────────────
+  deleteTask: async (id) => {
+    const { error } = await supabase.from('tasks').delete().eq('id', id)
+    if (!error) set(s => ({ tasks: s.tasks.filter(t => t.id !== id) }))
+    return { error }
+  },
+  deleteIdea: async (id) => {
+    const { error } = await supabase.from('ideas').delete().eq('id', id)
+    if (!error) set(s => ({ ideas: s.ideas.filter(i => i.id !== id) }))
+    return { error }
+  },
+  deleteVaultItem: async (id) => {
+    const { error } = await supabase.from('vault_items').delete().eq('id', id)
+    if (!error) set(s => ({ vaultItems: s.vaultItems.filter(v => v.id !== id) }))
+    return { error }
+  },
+  updateVaultItem: async (id, updates) => {
+    const { error } = await supabase.from('vault_items').update({ ...updates, updated_at: new Date().toISOString() }).eq('id', id)
+    if (!error) set(s => ({ vaultItems: s.vaultItems.map(v => v.id === id ? { ...v, ...updates } : v) }))
+    return { error }
+  },
+  updateIdea: async (id, updates) => {
+    const { error } = await supabase.from('ideas').update(updates).eq('id', id)
+    if (!error) set(s => ({ ideas: s.ideas.map(i => i.id === id ? { ...i, ...updates } : i) }))
+    return { error }
+  },
+
+  // ── Journal ───────────────────────────────────────────────
+  fetchJournalEntry: async (date) => {
+    const { user } = get()
+    const { data } = await supabase
+      .from('journal_entries')
+      .select('*')
+      .eq('user_id', user.id)
+      .eq('date', date)
+      .maybeSingle()
+    return data
+  },
+
+  saveJournalEntry: async ({ date, personalNote, autoSummary, journalImages, logEntries }) => {
+    const { user } = get()
+    const summaryPayload = autoSummary
+      ? { ...autoSummary, journal_images: journalImages || [], log_entries: logEntries || [] }
+      : ((journalImages?.length || logEntries?.length)
+          ? { journal_images: journalImages || [], log_entries: logEntries || [] }
+          : null)
+
+    const { data, error } = await supabase
+      .from('journal_entries')
+      .upsert({
+        user_id: user.id,
+        date,
+        personal_note: personalNote || null,
+        auto_summary: summaryPayload
+      }, { onConflict: 'user_id,date' })
+      .select()
+      .single()
+    return { data, error }
   }
 }))

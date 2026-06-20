@@ -5,7 +5,8 @@ const groq = new Groq({
   dangerouslyAllowBrowser: true
 })
 
-const MODEL = 'llama-3.3-70b-versatile'
+const MODEL        = 'llama-3.3-70b-versatile'
+const VISION_MODEL = 'meta-llama/llama-4-scout-17b-16e-instruct'
 
 // ────────────────────────────────────────────────────────────
 // CAPTURE PARSER
@@ -50,6 +51,35 @@ User input: "${rawInput}"`
 
   const raw = completion.choices[0]?.message?.content
   return JSON.parse(raw)
+}
+
+// ────────────────────────────────────────────────────────────
+// QUICK TASK PARSER
+// Fast extraction of due date / person from a plain-text task title
+// ────────────────────────────────────────────────────────────
+export async function parseTaskQuick(text) {
+  const prompt = `Extract task details from the input. Return ONLY this JSON:
+{
+  "title": "cleaned task title without date/person words",
+  "due": "ISO datetime or null (parse: today, tomorrow, next week, Monday, 3pm, etc.)",
+  "person": "person name mentioned or null",
+  "priority": "high|normal|low"
+}
+Today: ${new Date().toISOString()}
+Input: "${text}"`
+
+  try {
+    const completion = await groq.chat.completions.create({
+      model: MODEL,
+      messages: [{ role: 'user', content: prompt }],
+      temperature: 0.1,
+      max_tokens: 120,
+      response_format: { type: 'json_object' }
+    })
+    return JSON.parse(completion.choices[0]?.message?.content)
+  } catch {
+    return { title: text, due: null, person: null, priority: 'normal' }
+  }
 }
 
 // ────────────────────────────────────────────────────────────
@@ -125,24 +155,27 @@ Tags: ${JSON.stringify(idea.tags || [])}`
 // JOURNAL SUMMARIZER
 // Auto-generates daily journal summary from activity
 // ────────────────────────────────────────────────────────────
-export async function generateJournalSummary({ tasksCompleted, ideasCaptured, expenses, captures }) {
+export async function generateJournalSummary({ tasksCompleted, ideasCaptured, expenses, captures, logEntries }) {
+  const logText = logEntries?.length
+    ? logEntries.map(e => `[${new Date(e.time).toLocaleTimeString('en',{hour:'2-digit',minute:'2-digit'})}] ${e.text}`).join('\n')
+    : null
+
   const prompt = `You are Memora's journal AI. Write a calm, brief daily summary.
 
 Return ONLY this JSON:
 {
   "headline": "one sentence summary of the day (max 80 chars)",
-  "highlights": ["highlight 1", "highlight 2", "highlight 3"],
-  "stats": {
-    "tasks_completed": ${tasksCompleted.length},
-    "ideas_captured": ${ideasCaptured.length},
-    "total_spent": ${expenses.reduce((s, e) => s + (e.amount || 0), 0)}
-  }
+  "highlights": ["up to 4 highlights based on journal entries and activity"],
+  "suggested_tasks": ["follow-up tasks or next steps from journal entries — max 5, or empty array"],
+  "notes_followup": ["any follow-up notes, people to contact, or decisions to track — max 3, or empty array"]
 }
 
 Today's activity:
 - Tasks completed: ${tasksCompleted.map(t => t.title).join(', ') || 'none'}
 - Ideas captured: ${ideasCaptured.map(i => i.title).join(', ') || 'none'}
-- Expenses: ${expenses.map(e => `₹${e.amount} at ${e.vendor}`).join(', ') || 'none'}`
+- Expenses: ${expenses.map(e => `₹${e.amount} at ${e.vendor}`).join(', ') || 'none'}
+- Captures: ${captures?.map(c => c.raw_text || c.title || '').filter(Boolean).join(', ') || 'none'}
+${logText ? `\nJournal entries:\n${logText}` : ''}`
 
   const completion = await groq.chat.completions.create({
     model: MODEL,
@@ -154,6 +187,91 @@ Today's activity:
 
   const raw = completion.choices[0]?.message?.content
   return JSON.parse(raw)
+}
+
+// ────────────────────────────────────────────────────────────
+// IMAGE VISION ANALYZER
+// Understands the image content — no OCR, pure visual understanding
+// Returns classification + suggested actions for user to confirm
+// ────────────────────────────────────────────────────────────
+export async function analyzeImage(base64DataUrl) {
+  const prompt = `You are Memora's image analyst. Look at this image carefully and understand what it contains.
+
+Return ONLY this JSON — no explanation:
+{
+  "type": "reminder|task|receipt|expense|meeting|notes|screenshot|photo|other",
+  "title": "short descriptive title (max 55 chars)",
+  "summary": "1-2 sentence plain-English description of what you see",
+  "tasks": ["any to-do items, reminders, or action items you can read, as individual strings"],
+  "amount": null or number (only if it is a bill/receipt),
+  "vendor": null or string (only if it is a bill/receipt),
+  "date": null or ISO date string if a date is visible,
+  "confidence": 0.0 to 1.0
+}
+
+Classification guide:
+- "reminder" or "task"  → image shows a to-do list, reminder note, sticky note, or checklist
+- "receipt" or "expense" → image is a bill, invoice, or purchase receipt with amounts
+- "meeting"             → agenda, meeting notes, calendar invite, whiteboard
+- "notes"               → handwritten or typed notes, study material
+- "screenshot"          → app UI screenshot, website, chat
+- "photo"               → real-world photo (food, place, people, product)
+- "other"               → anything else
+
+Today: ${new Date().toISOString().split('T')[0]}`
+
+  const completion = await groq.chat.completions.create({
+    model: VISION_MODEL,
+    messages: [{
+      role: 'user',
+      content: [
+        { type: 'image_url', image_url: { url: base64DataUrl } },
+        { type: 'text', text: prompt }
+      ]
+    }],
+    temperature: 0.1,
+    max_tokens: 600,
+    response_format: { type: 'json_object' }
+  })
+
+  const raw = completion.choices[0]?.message?.content
+  return JSON.parse(raw)
+}
+
+// ────────────────────────────────────────────────────────────
+// BRAINSTORM SYNTHESIZER
+// Combines multiple ideas/tasks/notes into emergent insights
+// ────────────────────────────────────────────────────────────
+export async function brainstormIdeas(inputs) {
+  const context = inputs.map((item, i) =>
+    `[${i + 1}] ${item.type.toUpperCase()}: ${item.title}\n${item.body || ''}`
+  ).join('\n\n')
+
+  const prompt = `You are Memora's brainstorm AI. Analyze these ${inputs.length} inputs and synthesize creative, actionable insights.
+
+Return ONLY this JSON:
+{
+  "synthesis": "2-3 sentences explaining how these ideas connect, contrast, or combine",
+  "theme": "the core thread or opportunity in 5-8 words",
+  "tasks": ["next action 1", "next action 2", "next action 3"],
+  "followups": ["follow-up question or research 1", "follow-up question 2"],
+  "pipeline": ["stage 1", "stage 2", "stage 3", "stage 4"],
+  "newIdeas": ["emergent idea combining inputs 1", "emergent idea 2"]
+}
+
+Be specific and use real content from the inputs — never generic advice.
+
+Inputs:
+${context}`
+
+  const completion = await groq.chat.completions.create({
+    model: MODEL,
+    messages: [{ role: 'user', content: prompt }],
+    temperature: 0.6,
+    max_tokens: 700,
+    response_format: { type: 'json_object' }
+  })
+  return JSON.parse(completion.choices[0]?.message?.content)
 }
 
 // ────────────────────────────────────────────────────────────
