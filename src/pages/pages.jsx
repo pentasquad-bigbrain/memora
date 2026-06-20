@@ -677,15 +677,22 @@ export function Journal() {
       </div>
 
       <div className="page-scroll" style={{ paddingTop: 8 }}>
-        {/* Day at a glance */}
+        {/* Day at a glance — 2×2 tiles */}
         <div className="section-label">Day at a glance</div>
-        <div className="card" style={{ padding: '4px 16px' }}>
-          {ITEMS.map((item, i) => (
-            <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 0', borderBottom: i < ITEMS.length - 1 ? '1px solid var(--border)' : 'none' }}>
-              <div style={{ width: 30, height: 30, borderRadius: 'var(--r-sm)', background: item.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                <i className={`ti ${item.icon}`} style={{ fontSize: 14, color: item.color }} />
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+          {[
+            { icon: 'ti-check', color: 'var(--green)', bg: 'var(--green-soft)', num: dayDone.length, label: 'Tasks', sub: 'completed' },
+            { icon: 'ti-bulb',  color: 'var(--purple)', bg: 'var(--purple-soft)', num: dayIdeas.length, label: 'Ideas', sub: 'captured' },
+            { icon: 'ti-camera', color: 'var(--amber)', bg: 'var(--amber-soft)', num: dayCaptures.length, label: 'Captures', sub: 'saved' },
+            { icon: 'ti-currency-rupee', color: 'var(--accent)', bg: 'var(--accent-soft)', num: `₹${Math.round(totalSpent)||0}`, label: 'Expenses', sub: 'added' },
+          ].map((tile, i) => (
+            <div key={i} style={{ background: 'var(--bg)', borderRadius: 'var(--r)', padding: '14px', border: '1px solid var(--border)', display: 'flex', flexDirection: 'column', gap: 6 }}>
+              <div style={{ width: 32, height: 32, borderRadius: 8, background: tile.bg, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <i className={`ti ${tile.icon}`} style={{ fontSize: 16, color: tile.color }} />
               </div>
-              <div style={{ fontSize: 13 }}>{item.text}</div>
+              <div style={{ fontSize: 22, fontWeight: 700, color: 'var(--text)' }}>{tile.num}</div>
+              <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text)' }}>{tile.label}</div>
+              <div style={{ fontSize: 11, color: 'var(--muted)' }}>{tile.sub}</div>
             </div>
           ))}
         </div>
@@ -743,32 +750,41 @@ export function Journal() {
         ) : (
           <>
             <div className="section-label" style={{ marginTop: 20 }}>AI Summary</div>
-            <button className="btn btn-ghost" style={{ width: '100%', gap: 8 }} onClick={handleGenerate} disabled={generating}>
-              {generating ? <><div className="spinner" style={{ width: 14, height: 14 }} /> Generating…</> : <><i className="ti ti-sparkles" style={{ fontSize: 15 }} /> Generate AI Summary</>}
-            </button>
+            {generating ? (
+              <div style={{ background: 'var(--accent-soft)', border: '1px solid var(--accent-mid)', borderRadius: 'var(--r)', padding: '18px 16px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 16 }}>
+                  <div className="spinner" style={{ width: 18, height: 18 }} />
+                  <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--accent)' }}>Preparing your AI summary</div>
+                </div>
+                {[
+                  { done: true,  label: 'Reviewing your journal entries' },
+                  { done: true,  label: 'Scanning vault items' },
+                  { done: false, label: 'Cleaning clutter' },
+                  { done: false, label: 'Generating summary' },
+                ].map((step, i) => (
+                  <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '6px 0' }}>
+                    {step.done
+                      ? <i className="ti ti-circle-check" style={{ fontSize: 16, color: 'var(--green)', flexShrink: 0 }} />
+                      : <div style={{ width: 16, height: 16, borderRadius: '50%', border: '2px solid var(--border-strong)', flexShrink: 0 }} />}
+                    <div>
+                      <div style={{ fontSize: 13, color: step.done ? 'var(--text)' : 'var(--muted)' }}>{step.label}</div>
+                      {!step.done && i === 2 && <div style={{ fontSize: 11, color: 'var(--hint)' }}>Sorting and removing duplicates</div>}
+                      {!step.done && i === 3 && <div style={{ fontSize: 11, color: 'var(--hint)' }}>Almost there…</div>}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <button className="btn btn-ghost" style={{ width: '100%', gap: 8 }} onClick={handleGenerate}>
+                <i className="ti ti-sparkles" style={{ fontSize: 16 }} /> Generate AI Summary
+              </button>
+            )}
           </>
         )}
 
         {/* ── Log Entries ── */}
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 20, marginBottom: 8 }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 20, marginBottom: 10 }}>
           <div className="section-label" style={{ margin: 0 }}>Log entries {logEntries.length > 0 && <span style={{ color: 'var(--hint)', fontWeight: 400 }}>({logEntries.length})</span>}</div>
-          <div style={{ display: 'flex', gap: 6 }}>
-            <button
-              onClick={toggleRecording}
-              style={{ width: 32, height: 32, borderRadius: '50%', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', background: recording ? 'var(--red)' : 'var(--accent-soft)', color: recording ? '#fff' : 'var(--accent)', animation: recording ? 'pulse 1.2s infinite' : 'none' }}
-              title={recording ? 'Stop — will add as entry' : 'Dictate a new entry'}
-            >
-              <i className={`ti ${recording ? 'ti-microphone-off' : 'ti-microphone'}`} style={{ fontSize: 14 }} />
-            </button>
-            <button
-              onClick={() => imgInputRef.current?.click()}
-              style={{ width: 32, height: 32, borderRadius: '50%', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--purple-soft)', color: 'var(--purple)' }}
-              title="Attach photo"
-            >
-              <i className="ti ti-photo" style={{ fontSize: 14 }} />
-            </button>
-            <input ref={imgInputRef} type="file" accept="image/*" multiple style={{ display: 'none' }} onChange={handleImagePick} />
-          </div>
         </div>
 
         {recording && (
@@ -820,25 +836,42 @@ export function Journal() {
         ))}
 
         {/* Add new entry input */}
-        <div style={{ display: 'flex', gap: 8, marginBottom: 4 }}>
+        <div style={{ background: 'var(--bg)', border: '1.5px solid var(--border)', borderRadius: 'var(--r)', padding: '10px 12px', marginBottom: 8 }}>
           <textarea
             ref={newEntryRef}
             className="input"
-            placeholder={logEntries.length === 0 ? "What's on your mind? Add your first entry…" : "Add another entry…"}
+            placeholder={logEntries.length === 0 ? "What happened today?" : "Add another entry…"}
             value={newEntryText}
             onChange={e => setNewEntryText(e.target.value)}
             onKeyDown={e => { if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) { e.preventDefault(); addEntry(newEntryText) } }}
-            style={{ flex: 1, minHeight: 76, fontSize: 13, resize: 'none' }}
+            style={{ border: 'none', background: 'transparent', minHeight: 70, fontSize: 15, resize: 'none', padding: '2px 0', width: '100%' }}
           />
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 8 }}>
+            <button
+              onClick={toggleRecording}
+              style={{ width: 34, height: 34, borderRadius: '50%', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', background: recording ? 'var(--red)' : 'var(--surface)', color: recording ? '#fff' : 'var(--muted)', animation: recording ? 'pulse 1.2s infinite' : 'none', flexShrink: 0 }}
+              title={recording ? 'Stop recording' : 'Voice entry'}
+            >
+              <i className={`ti ${recording ? 'ti-microphone-off' : 'ti-microphone'}`} style={{ fontSize: 15 }} />
+            </button>
+            <button
+              onClick={() => imgInputRef.current?.click()}
+              style={{ width: 34, height: 34, borderRadius: '50%', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--surface)', color: 'var(--muted)', flexShrink: 0 }}
+              title="Attach photo"
+            >
+              <i className="ti ti-camera" style={{ fontSize: 15 }} />
+            </button>
+            <input ref={imgInputRef} type="file" accept="image/*" capture="environment" multiple style={{ display: 'none' }} onChange={handleImagePick} />
+            <button
+              className="btn btn-ghost"
+              onClick={() => addEntry(newEntryText)}
+              disabled={!newEntryText.trim()}
+              style={{ marginLeft: 'auto', fontSize: 13, padding: '8px 16px', minHeight: 36 }}
+            >
+              <i className="ti ti-plus" style={{ fontSize: 13 }} /> Add entry
+            </button>
+          </div>
         </div>
-        <button
-          className="btn btn-ghost"
-          onClick={() => addEntry(newEntryText)}
-          disabled={!newEntryText.trim()}
-          style={{ fontSize: 13, marginBottom: 6, alignSelf: 'flex-start' }}
-        >
-          <i className="ti ti-plus" style={{ fontSize: 13 }} /> Add entry
-        </button>
 
         {/* Image gallery — journal-only, never in vault */}
         {journalImages.length > 0 && (
@@ -1156,14 +1189,23 @@ function BrainstormPanel({ ideas, tasks, onSaveTask, onClose }) {
   )
 }
 
+const STATUS_META = {
+  raw:         { label:'New',         color:'var(--green)',  bg:'var(--green-soft)' },
+  in_progress: { label:'In progress', color:'var(--accent)', bg:'var(--accent-soft)' },
+  done:        { label:'Completed',   color:'var(--muted)',  bg:'var(--bg)' },
+}
+
 export function IdeaLab() {
-  const { ideas, tasks, vaultItems, addTask, addIdea, deleteIdea } = useStore()
-  const [selected, setSelected]     = useState(null)
-  const [expansion, setExpansion]   = useState(null)
-  const [loading, setLoading]       = useState(false)
+  const { ideas, tasks, vaultItems, addTask, addIdea, updateIdea, deleteIdea } = useStore()
+  const [activeTab,  setActiveTab]  = useState('recent')
+  const [selected,   setSelected]   = useState(null)
+  const [expansion,  setExpansion]  = useState(null)
+  const [loading,    setLoading]    = useState(false)
   const [savedTasks, setSavedTasks] = useState(new Set())
-  const [showNew, setShowNew]       = useState(false)
+  const [showNew,    setShowNew]    = useState(false)
   const [showBrainstorm, setShowBrainstorm] = useState(false)
+  const [showSearch, setShowSearch] = useState(false)
+  const [search,     setSearch]     = useState('')
   const [toast, showToast] = useToast()
 
   const handleExpand = async (idea) => {
@@ -1189,146 +1231,191 @@ export function IdeaLab() {
     if (!error) { setSelected(null); showToast('Idea deleted') }
   }
 
+  const handleStatusChange = async (idea, status) => {
+    if (updateIdea) await updateIdea(idea.id, { status })
+    setSelected(prev => prev ? { ...prev, status } : prev)
+    showToast('Status updated')
+  }
+
+  const filteredIdeas = ideas.filter(i => {
+    if (search) return i.title.toLowerCase().includes(search.toLowerCase()) || i.body?.toLowerCase().includes(search.toLowerCase())
+    if (activeTab === 'recent')      return i.status === 'raw' || !i.status
+    if (activeTab === 'in_progress') return i.status === 'in_progress'
+    if (activeTab === 'completed')   return i.status === 'done'
+    return true
+  })
+
+  if (selected) {
+    return (
+      <div className="page">
+        <div style={{ padding: 'max(14px,env(safe-area-inset-top)) 16px 0', display: 'flex', alignItems: 'center', gap: 10 }}>
+          <button onClick={() => { setSelected(null); setExpansion(null) }} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 4, color: 'var(--muted)' }}>
+            <i className="ti ti-arrow-left" style={{ fontSize: 22 }} />
+          </button>
+          <div style={{ fontSize: 17, fontWeight: 600, flex: 1 }}>Idea</div>
+          <button className="btn btn-danger" style={{ padding: '8px 14px', fontSize: 13 }} onClick={() => handleDelete(selected.id)}>
+            <i className="ti ti-trash" style={{ fontSize: 14 }} />
+          </button>
+        </div>
+
+        <div className="page-scroll" style={{ paddingTop: 16 }}>
+          <div style={{ display: 'flex', gap: 6, marginBottom: 16, flexWrap: 'wrap' }}>
+            {Object.entries(STATUS_META).map(([key, meta]) => (
+              <button key={key} onClick={() => handleStatusChange(selected, key)} style={{ padding: '5px 14px', borderRadius: 20, fontSize: 12, fontWeight: 600, border: '1.5px solid', cursor: 'pointer', fontFamily: 'inherit', background: (selected.status||'raw') === key ? meta.bg : 'transparent', color: (selected.status||'raw') === key ? meta.color : 'var(--muted)', borderColor: (selected.status||'raw') === key ? meta.color : 'var(--border)' }}>
+                {meta.label}
+              </button>
+            ))}
+          </div>
+
+          <div className="card" style={{ marginBottom: 16 }}>
+            <div style={{ fontSize: 18, fontWeight: 600, marginBottom: 6 }}>{selected.title}</div>
+            {selected.body && <div style={{ fontSize: 14, color: 'var(--muted)', lineHeight: 1.6 }}>{selected.body}</div>}
+            {selected.tags?.length > 0 && (
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginTop: 10 }}>
+                {selected.tags.map(t => <span key={t} className="pill" style={{ fontSize: 11 }}>{t}</span>)}
+              </div>
+            )}
+          </div>
+
+          <button className="btn btn-ghost" style={{ width: '100%', gap: 8, marginBottom: 16 }} onClick={() => handleExpand(selected)} disabled={loading}>
+            {loading ? <><div className="spinner" style={{ width: 14, height: 14 }} /> Thinking…</> : <><i className="ti ti-sparkles" style={{ fontSize: 15 }} /> {expansion ? 'Re-expand' : 'Expand with AI'}</>}
+          </button>
+
+          {expansion && (
+            <>
+              <div style={{ background: 'linear-gradient(135deg, var(--purple-soft), var(--accent-soft))', borderRadius: 'var(--r)', padding: '14px 16px', marginBottom: 12 }}>
+                <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--purple)', textTransform: 'uppercase', letterSpacing: .5, marginBottom: 6 }}>AI Expansion</div>
+                <div style={{ fontSize: 14, color: 'var(--text)', lineHeight: 1.6 }}>{expansion.expanded}</div>
+              </div>
+
+              {expansion.tasks?.length > 0 && (
+                <>
+                  <div className="section-label">Action items</div>
+                  {expansion.tasks.map((t, i) => (
+                    <div key={i} style={{ display: 'flex', gap: 10, alignItems: 'center', padding: '12px 14px', border: '1px solid var(--border)', borderRadius: 'var(--r-sm)', marginBottom: 8, background: savedTasks.has(i) ? 'var(--green-soft)' : 'var(--surface)' }}>
+                      <i className="ti ti-checkbox" style={{ color: savedTasks.has(i) ? 'var(--green)' : 'var(--accent)', fontSize: 16, flexShrink: 0 }} />
+                      <div style={{ flex: 1, fontSize: 13, textDecoration: savedTasks.has(i) ? 'line-through' : 'none', color: savedTasks.has(i) ? 'var(--muted)' : 'var(--text)' }}>{t}</div>
+                      {!savedTasks.has(i) ? <button onClick={() => handleSaveTask(t, i)} style={{ background: 'var(--accent-soft)', border: 'none', color: 'var(--accent-dark)', fontSize: 12, fontWeight: 600, padding: '5px 12px', borderRadius: 20, cursor: 'pointer', flexShrink: 0 }}>+ Task</button>
+                        : <span style={{ fontSize: 11, color: 'var(--green)', fontWeight: 600 }}>Saved</span>}
+                    </div>
+                  ))}
+                </>
+              )}
+
+              {expansion.questions?.length > 0 && (
+                <>
+                  <div className="section-label">Questions to explore</div>
+                  <div className="card" style={{ padding: '4px 16px' }}>
+                    {expansion.questions.map((q, i) => (
+                      <div key={i} style={{ display: 'flex', gap: 10, alignItems: 'flex-start', padding: '10px 0', borderBottom: i < expansion.questions.length - 1 ? '1px solid var(--border)' : 'none' }}>
+                        <i className="ti ti-question-mark" style={{ color: 'var(--purple)', fontSize: 14, marginTop: 2, flexShrink: 0 }} />
+                        <div style={{ fontSize: 13, lineHeight: 1.5 }}>{q}</div>
+                      </div>
+                    ))}
+                  </div>
+                </>
+              )}
+            </>
+          )}
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="page">
       {/* Header */}
-      <div style={{ padding: '14px 16px 0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <div>
-          <h2>IdeaLab</h2>
-          <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 2 }}>Your brainstorming canvas</div>
-        </div>
+      <div style={{ padding: 'max(14px,env(safe-area-inset-top)) 16px 0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <div style={{ fontSize: 22, fontWeight: 700 }}>IdeaLab</div>
         <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
-          {ideas.length >= 2 && (
-            <button
-              onClick={() => setShowBrainstorm(true)}
-              style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'linear-gradient(135deg, var(--purple-soft), var(--accent-soft))', border: '1px solid var(--accent-mid)', borderRadius: 'var(--r-full)', padding: '6px 12px', cursor: 'pointer', fontFamily: 'inherit' }}
-            >
-              <i className="ti ti-sparkles" style={{ fontSize: 13, color: 'var(--purple)' }} />
-              <span style={{ fontSize: 12, fontWeight: 500, color: 'var(--purple)' }}>Brainstorm</span>
-            </button>
-          )}
-          <button
-            onClick={() => setShowNew(true)}
-            style={{ width: 40, height: 40, borderRadius: '50%', background: 'var(--purple)', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
-          >
-            <i className="ti ti-plus" style={{ fontSize: 20, color: '#fff' }} />
+          <button onClick={() => { setShowSearch(s => !s); setSearch('') }} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 4, color: showSearch ? 'var(--accent)' : 'var(--muted)' }}>
+            <i className="ti ti-search" style={{ fontSize: 20 }} />
+          </button>
+          <button style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 4, color: 'var(--muted)' }}>
+            <i className="ti ti-dots" style={{ fontSize: 20 }} />
           </button>
         </div>
       </div>
 
+      {showSearch && (
+        <div style={{ padding: '8px 16px 0' }}>
+          <div className="search-bar">
+            <i className="ti ti-search" />
+            <input placeholder="Search ideas…" value={search} onChange={e => setSearch(e.target.value)} autoFocus />
+            {search && <button onClick={() => setSearch('')} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 2, color: 'var(--muted)' }}><i className="ti ti-x" style={{ fontSize: 14 }} /></button>}
+          </div>
+        </div>
+      )}
+
       <div className="page-scroll" style={{ paddingTop: 12 }}>
-        {!selected ? (
-          <>
-            {ideas.length === 0 ? (
-              <div style={{ textAlign: 'center', padding: '60px 0 40px' }}>
-                <div style={{ width: 64, height: 64, borderRadius: '50%', background: 'var(--purple-soft)', margin: '0 auto 16px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                  <i className="ti ti-bulb" style={{ fontSize: 28, color: 'var(--purple)' }} />
-                </div>
-                <div style={{ fontSize: 15, fontWeight: 500, marginBottom: 6 }}>No ideas yet</div>
-                <div style={{ fontSize: 13, color: 'var(--muted)', marginBottom: 20 }}>Capture your first idea from text, photos, tasks, or notes</div>
-                <button className="btn btn-primary" style={{ background: 'var(--purple)' }} onClick={() => setShowNew(true)}>
-                  <i className="ti ti-plus" style={{ fontSize: 15 }} /> New Idea
-                </button>
-              </div>
-            ) : (
-              <>
-                {ideas.length >= 2 && (
-                  <div style={{ background: 'linear-gradient(135deg, var(--purple-soft), var(--accent-soft))', border: '1px solid var(--accent-mid)', borderRadius: 'var(--r)', padding: '14px 16px', marginBottom: 16, cursor: 'pointer' }} onClick={() => setShowBrainstorm(true)}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                      <i className="ti ti-sparkles" style={{ fontSize: 22, color: 'var(--purple)' }} />
-                      <div>
-                        <div style={{ fontSize: 14, fontWeight: 500 }}>Brainstorm {ideas.length} ideas</div>
-                        <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 2 }}>Let AI synthesize tasks, pipelines & follow-ups</div>
-                      </div>
-                      <i className="ti ti-chevron-right" style={{ color: 'var(--muted)', marginLeft: 'auto' }} />
-                    </div>
-                  </div>
-                )}
 
-                <div className="section-label">My ideas ({ideas.length})</div>
-                {ideas.map(idea => (
-                  <div key={idea.id} className="card" style={{ marginBottom: 8, cursor: 'pointer' }} onClick={() => { setSelected(idea); setExpansion(null); setSavedTasks(new Set()) }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8 }}>
-                      <div style={{ flex: 1 }}>
-                        <div style={{ fontSize: 14, fontWeight: 500 }}>{idea.title}</div>
-                        {idea.body && <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 4, lineHeight: 1.5 }}>{idea.body.slice(0, 80)}{idea.body.length > 80 ? '…' : ''}</div>}
-                      </div>
-                      <span style={{ fontSize: 10, color: 'var(--muted)', flexShrink: 0, marginTop: 2 }}>{idea.created_at ? format(new Date(idea.created_at), 'd MMM') : ''}</span>
-                    </div>
-                    {idea.tags?.length > 0 && (
-                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginTop: 8 }}>
-                        {idea.tags.map(t => <span key={t} className="pill" style={{ fontSize: 10 }}>{t}</span>)}
-                      </div>
-                    )}
-                  </div>
-                ))}
-              </>
-            )}
-          </>
-        ) : (
-          /* Idea detail view */
-          <>
-            <button onClick={() => { setSelected(null); setExpansion(null) }} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--accent)', fontSize: 13, padding: 0, marginBottom: 12, display: 'flex', alignItems: 'center', gap: 4 }}>
-              <i className="ti ti-arrow-left" style={{ fontSize: 16 }} /> All ideas
+        {/* Hero banner */}
+        <div style={{ background: 'linear-gradient(135deg, #6D28D9, #3B82F6)', borderRadius: 'var(--r-lg)', padding: '22px 20px', marginBottom: 16, position: 'relative', overflow: 'hidden' }}>
+          <div style={{ position: 'absolute', top: -20, right: -20, width: 100, height: 100, borderRadius: '50%', background: 'rgba(255,255,255,0.08)' }} />
+          <div style={{ position: 'absolute', bottom: -30, right: 20, width: 80, height: 80, borderRadius: '50%', background: 'rgba(255,255,255,0.06)' }} />
+          <i className="ti ti-bulb" style={{ fontSize: 32, color: 'rgba(255,255,255,0.9)', marginBottom: 10, display: 'block' }} />
+          <div style={{ fontSize: 20, fontWeight: 700, color: '#fff', lineHeight: 1.2, marginBottom: 4 }}>Your ideas.</div>
+          <div style={{ fontSize: 20, fontWeight: 700, color: 'rgba(255,255,255,0.85)', marginBottom: 6 }}>Unlimited potential.</div>
+          <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.65)', marginBottom: 16 }}>Capture, connect and build something amazing</div>
+          <button onClick={() => setShowNew(true)} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '9px 18px', background: 'rgba(255,255,255,0.2)', border: '1px solid rgba(255,255,255,0.35)', borderRadius: 'var(--r-full)', color: '#fff', fontSize: 13, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', backdropFilter: 'blur(4px)' }}>
+            <i className="ti ti-plus" style={{ fontSize: 14 }} /> New idea
+          </button>
+          {ideas.length >= 2 && (
+            <button onClick={() => setShowBrainstorm(true)} style={{ marginLeft: 8, display: 'inline-flex', alignItems: 'center', gap: 6, padding: '9px 18px', background: 'rgba(255,255,255,0.1)', border: '1px solid rgba(255,255,255,0.2)', borderRadius: 'var(--r-full)', color: 'rgba(255,255,255,0.8)', fontSize: 13, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>
+              <i className="ti ti-sparkles" style={{ fontSize: 14 }} /> Brainstorm
             </button>
+          )}
+        </div>
 
-            <div className="card">
-              <div style={{ fontSize: 16, fontWeight: 500 }}>{selected.title}</div>
-              {selected.body && <div style={{ fontSize: 13, color: 'var(--muted)', marginTop: 6, lineHeight: 1.5 }}>{selected.body}</div>}
-              {selected.tags?.length > 0 && (
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginTop: 8 }}>
-                  {selected.tags.map(t => <span key={t} className="pill" style={{ fontSize: 10 }}>{t}</span>)}
-                </div>
-              )}
-              <div style={{ display: 'flex', gap: 8, marginTop: 14 }}>
-                <button className="btn btn-ghost" style={{ flex: 1, fontSize: 12 }} onClick={() => handleExpand(selected)} disabled={loading}>
-                  {loading ? <><div className="spinner" style={{ width: 14, height: 14 }} /> Thinking…</> : <><i className="ti ti-sparkles" style={{ fontSize: 14 }} /> {expansion ? 'Re-expand' : 'Expand idea'}</>}
-                </button>
-                <button className="btn btn-danger" style={{ fontSize: 12, padding: '10px 14px' }} onClick={() => handleDelete(selected.id)}>
-                  <i className="ti ti-trash" style={{ fontSize: 14 }} />
-                </button>
-              </div>
-            </div>
-
-            {expansion && (
-              <>
-                <div className="section-label">AI expansion</div>
-                <div className="card">
-                  <div style={{ fontSize: 13, color: 'var(--text)', lineHeight: 1.6 }}>{expansion.expanded}</div>
-                </div>
-
-                {expansion.tasks?.length > 0 && (
-                  <>
-                    <div className="section-label">Suggested tasks</div>
-                    {expansion.tasks.map((t, i) => (
-                      <div key={i} style={{ display: 'flex', gap: 10, alignItems: 'center', padding: '10px 14px', border: '1px solid var(--border)', borderRadius: 'var(--r-sm)', marginBottom: 6, background: 'var(--surface)' }}>
-                        <i className="ti ti-circle" style={{ color: savedTasks.has(i) ? 'var(--green)' : 'var(--accent)', fontSize: 14, flexShrink: 0 }} />
-                        <div style={{ flex: 1, fontSize: 13, textDecoration: savedTasks.has(i) ? 'line-through' : 'none', color: savedTasks.has(i) ? 'var(--muted)' : 'var(--text)' }}>{t}</div>
-                        {!savedTasks.has(i)
-                          ? <button onClick={() => handleSaveTask(t, i)} style={{ background: 'var(--accent-soft)', border: 'none', color: 'var(--accent-dark)', fontSize: 11, fontWeight: 500, padding: '4px 10px', borderRadius: 20, cursor: 'pointer', flexShrink: 0 }}>+ Task</button>
-                          : <span style={{ fontSize: 11, color: 'var(--green)', fontWeight: 500 }}>Saved</span>}
-                      </div>
-                    ))}
-                  </>
+        {/* Tabs */}
+        {!search && (
+          <div className="tabs" style={{ marginBottom: 14 }}>
+            {[['recent','Recent ideas'],['in_progress','In progress'],['completed','Completed']].map(([key, label]) => (
+              <button key={key} className={`tab ${activeTab === key ? 'active' : ''}`} onClick={() => setActiveTab(key)} style={{ flex: 1, fontSize: 12 }}>
+                {label}
+                {key === 'recent' && ideas.filter(i => !i.status || i.status === 'raw').length > 0 && (
+                  <span style={{ marginLeft: 4, background: activeTab === key ? 'var(--accent)' : 'var(--border-strong)', color: activeTab === key ? '#fff' : 'var(--muted)', borderRadius: 10, padding: '1px 5px', fontSize: 9 }}>
+                    {ideas.filter(i => !i.status || i.status === 'raw').length}
+                  </span>
                 )}
-
-                {expansion.questions?.length > 0 && (
-                  <>
-                    <div className="section-label">Questions to explore</div>
-                    <div className="card" style={{ padding: '4px 16px' }}>
-                      {expansion.questions.map((q, i) => (
-                        <div key={i} style={{ display: 'flex', gap: 10, alignItems: 'flex-start', padding: '10px 0', borderBottom: i < expansion.questions.length - 1 ? '1px solid var(--border)' : 'none' }}>
-                          <i className="ti ti-question-mark" style={{ color: 'var(--purple)', fontSize: 14, marginTop: 1, flexShrink: 0 }} />
-                          <div style={{ fontSize: 13, lineHeight: 1.5 }}>{q}</div>
-                        </div>
-                      ))}
-                    </div>
-                  </>
-                )}
-              </>
-            )}
-          </>
+              </button>
+            ))}
+          </div>
         )}
+
+        {filteredIdeas.length === 0 ? (
+          <div style={{ textAlign: 'center', padding: '40px 20px', color: 'var(--muted)' }}>
+            <div style={{ fontSize: 36, marginBottom: 10 }}>💡</div>
+            <div style={{ fontSize: 15, fontWeight: 500, color: 'var(--text)', marginBottom: 6 }}>
+              {search ? 'No ideas match' : activeTab === 'in_progress' ? 'Nothing in progress' : activeTab === 'completed' ? 'No completed ideas' : 'No ideas yet'}
+            </div>
+            <div style={{ fontSize: 13 }}>
+              {search ? 'Try different keywords' : 'Tap + New idea to get started'}
+            </div>
+          </div>
+        ) : (
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+            {filteredIdeas.map(idea => {
+              const meta = STATUS_META[idea.status || 'raw'] || STATUS_META.raw
+              return (
+                <div key={idea.id} onClick={() => { setSelected(idea); setExpansion(null); setSavedTasks(new Set()) }} style={{ background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: 'var(--r)', padding: '12px', cursor: 'pointer', display: 'flex', flexDirection: 'column', gap: 6 }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 4 }}>
+                    <div style={{ width: 28, height: 28, borderRadius: 8, background: 'var(--purple-soft)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                      <i className="ti ti-bulb" style={{ fontSize: 14, color: 'var(--purple)' }} />
+                    </div>
+                    <span style={{ fontSize: 10, fontWeight: 600, background: meta.bg, color: meta.color, padding: '2px 8px', borderRadius: 10, whiteSpace: 'nowrap' }}>{meta.label}</span>
+                  </div>
+                  <div style={{ fontSize: 13, fontWeight: 600, lineHeight: 1.3, color: 'var(--text)', marginTop: 2 }}>{idea.title}</div>
+                  {idea.body && <div style={{ fontSize: 11, color: 'var(--muted)', lineHeight: 1.4, overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' }}>{idea.body}</div>}
+                  <div style={{ fontSize: 10, color: 'var(--hint)', marginTop: 'auto', paddingTop: 4 }}>
+                    {idea.created_at ? format(new Date(idea.created_at), 'd MMM yyyy') : ''}
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        )}
+
       </div>
 
       {showNew && <NewIdeaModal tasks={tasks} vaultItems={vaultItems} onClose={() => setShowNew(false)} onSave={handleNewIdea} />}

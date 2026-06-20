@@ -12,6 +12,7 @@ import People from './pages/People'
 import Vault from './pages/Vault'
 import Journal from './pages/Journal'
 import IdeaLab from './pages/IdeaLab'
+import Menu from './pages/Menu'
 import Auth from './pages/Auth'
 
 export default function App() {
@@ -49,6 +50,7 @@ export default function App() {
         <Route path="/vault"   element={<Vault />} />
         <Route path="/journal" element={<Journal />} />
         <Route path="/idealab" element={<IdeaLab />} />
+        <Route path="/menu"    element={<Menu />} />
         <Route path="*"        element={<Navigate to="/" />} />
       </Routes>
       <BottomNav />
