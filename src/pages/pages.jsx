@@ -138,11 +138,14 @@ function VaultItemModal({ item, onClose, onDelete, onUpdate }) {
   const [editTitle,  setEditTitle]  = useState(item.title || '')
   const [editDesc,   setEditDesc]   = useState(item.ocr_text || '')
   const [editType,   setEditType]   = useState(item.type || 'note')
+  const [editTags,   setEditTags]   = useState(item.tags || [])
   const meta = VAULT_META[item.type] || VAULT_META.note
+
+  const toggleEditTag = (tag) => setEditTags(prev => prev.includes(tag) ? prev.filter(t => t !== tag) : [...prev, tag])
 
   const handleSaveEdit = async () => {
     setSaving(true)
-    await onUpdate(item.id, { title: editTitle.trim() || 'Untitled', ocr_text: editDesc.trim() || null, type: editType })
+    await onUpdate(item.id, { title: editTitle.trim() || 'Untitled', ocr_text: editDesc.trim() || null, type: editType, tags: editTags })
     setSaving(false)
     setEditing(false)
   }
@@ -176,6 +179,18 @@ function VaultItemModal({ item, onClose, onDelete, onUpdate }) {
                       color: editType === t ? '#fff' : 'var(--muted)',
                       borderColor: editType === t ? 'var(--accent)' : 'var(--border)' }}
                   >{t}</button>
+                ))}
+              </div>
+              <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: .4, marginBottom: 8 }}>Tags</div>
+              <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 14 }}>
+                {VAULT_PRESET_TAGS.map(tag => (
+                  <button
+                    key={tag} onClick={() => toggleEditTag(tag)}
+                    style={{ padding: '4px 12px', borderRadius: 20, fontSize: 11, border: '1px solid', cursor: 'pointer', fontFamily: 'inherit',
+                      background: editTags.includes(tag) ? 'var(--accent)' : 'transparent',
+                      color: editTags.includes(tag) ? '#fff' : 'var(--muted)',
+                      borderColor: editTags.includes(tag) ? 'var(--accent)' : 'var(--border)' }}
+                  >{tag}</button>
                 ))}
               </div>
               <div style={{ display: 'flex', gap: 8 }}>
@@ -515,6 +530,19 @@ export function Vault() {
         )}
 
         <div style={{ display: 'flex', gap: 6, padding: '10px 0', overflowX: 'auto', scrollbarWidth: 'none' }}>
+          <button
+            className="pill"
+            onClick={() => setReviewMode(m => !m)}
+            style={{
+              display: 'flex', alignItems: 'center', gap: 5,
+              background: reviewMode ? 'var(--accent)' : 'var(--accent-soft)',
+              color: reviewMode ? '#fff' : 'var(--accent-dark)',
+              borderColor: reviewMode ? 'var(--accent)' : 'var(--accent-mid)'
+            }}
+          >
+            <i className="ti ti-photo-scan" style={{ fontSize: 13 }} />
+            Review{needsReview.length > 0 && ` (${needsReview.length})`}
+          </button>
           {VAULT_CATS.map(c => (
             <button key={c} className={`pill ${!reviewMode && cat === c ? 'active' : ''}`} onClick={() => { setCat(c); setReviewMode(false) }} style={{ textTransform: 'capitalize' }}>{c}</button>
           ))}
