@@ -392,7 +392,7 @@ export default function Tasks() {
     const done   = list.filter(t=>t.status==='done')
 
     if (activeTab==='today') {
-      const r = active.filter(t=>!t.due_at||isToday(new Date(t.due_at))||(isPast(new Date(t.due_at))&&!isToday(new Date(t.due_at))))
+      const r = active.filter(t=>t.status==='in_progress'||!t.due_at||isToday(new Date(t.due_at))||(isPast(new Date(t.due_at))&&!isToday(new Date(t.due_at))))
       return r.sort((a,b)=>{
         const aO=a.due_at&&isPast(new Date(a.due_at))&&!isToday(new Date(a.due_at))
         const bO=b.due_at&&isPast(new Date(b.due_at))&&!isToday(new Date(b.due_at))
@@ -419,7 +419,7 @@ export default function Tasks() {
   }, [tasks, activeTab, search])
 
   const tabCounts = useMemo(() => ({
-    today:    tasks.filter(t=>t.status!=='done'&&(!t.due_at||isToday(new Date(t.due_at))||(isPast(new Date(t.due_at))&&!isToday(new Date(t.due_at))))).length,
+    today:    tasks.filter(t=>t.status!=='done'&&(t.status==='in_progress'||!t.due_at||isToday(new Date(t.due_at))||(isPast(new Date(t.due_at))&&!isToday(new Date(t.due_at))))).length,
     tomorrow: tasks.filter(t=>t.status!=='done'&&t.due_at&&isTomorrow(new Date(t.due_at))).length,
     done:     tasks.filter(t=>t.status==='done').length,
   }), [tasks])

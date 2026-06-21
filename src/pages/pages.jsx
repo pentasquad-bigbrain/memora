@@ -231,6 +231,7 @@ function AddVaultModal({ onClose, onSave }) {
   // text
   const [title, setTitle]     = useState('')
   const [body, setBody]       = useState('')
+  const [personalNote, setPersonalNote] = useState('')
   const [selectedTags, setSelectedTags] = useState([])
 
   // image — AI powered
@@ -291,19 +292,17 @@ function AddVaultModal({ onClose, onSave }) {
   const stopRecording = () => { recRef.current?.stop(); clearInterval(timerRef.current); setRecording(false) }
   const formatTime = (s) => `${String(Math.floor(s / 60)).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`
 
-  const handleSave = async () => {
-    if (needsContext && tab === 'image' && !imgDesc.trim()) {
-      return
-    }
-    setSaving(true)
+  const handleSave = () => {
+    if (needsContext && tab === 'image' && !imgDesc.trim()) return
     if (tab === 'text') {
-      await onSave({ title: title.trim() || 'Note', ocr_text: body.trim() || null, type: 'note', tags: selectedTags })
+      if (!title.trim()) return
+      onSave({ title: title.trim(), ocr_text: [body.trim(), personalNote.trim()].filter(Boolean).join('\n\n') || null, type: 'note', tags: selectedTags })
     } else if (tab === 'image') {
-      await onSave({ title: imgTitle.trim() || 'Image', file_url: imgPreview, ocr_text: imgDesc || null, type: 'image', tags: selectedTags })
+      onSave({ title: imgTitle.trim() || 'Image', file_url: imgPreview, ocr_text: [imgDesc, personalNote.trim()].filter(Boolean).join('\n\n') || null, type: 'image', tags: selectedTags })
     } else {
-      await onSave({ title: audioTitle.trim() || `Voice note · ${format(new Date(), 'h:mm a')}`, ocr_text: transcript || null, type: 'note', tags: ['voice', ...selectedTags] })
+      onSave({ title: audioTitle.trim() || `Voice note · ${format(new Date(), 'h:mm a')}`, ocr_text: [transcript, personalNote.trim()].filter(Boolean).join('\n\n') || null, type: 'note', tags: ['voice', ...selectedTags] })
     }
-    setSaving(false); onClose()
+    onClose()
   }
 
   const canSave = tab === 'text' ? !!title.trim() : tab === 'image' ? (!!imgPreview && (!needsContext || !!imgDesc.trim())) : !!transcript
@@ -415,11 +414,84 @@ function AddVaultModal({ onClose, onSave }) {
             </>
           )}
 
-          <div style={{ display: 'flex', gap: 8, marginTop: 14 }}>
-            <button className="btn btn-primary" style={{ flex: 1 }} onClick={handleSave} disabled={!canSave || saving || analyzing}>
-              {saving ? 'Saving…' : 'Save to Vault'}
+          {/* Optional personal note */}
+          {(tab === 'text' || tab === 'image' || tab === 'audio') && (
+            <textarea
+              className="input"
+              placeholder="Personal note (optional)…"
+              value={personalNote}
+              onChange={e => setPersonalNote(e.target.value)}
+              style={{ minHeight: 56, marginTop: 10, fontSize: 13 }}
+            />
+          )}
+
+          <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
+            <button className="btn btn-primary" style={{ flex: 1 }} onClick={handleSave} disabled={!canSave || analyzing}>
+              Save to Vault
             </button>
             <button className="btn btn-ghost" onClick={onClose}>Cancel</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function ReviewModal({ images, onUpdate, onClose }) {
+  const [idx, setIdx]       = useState(0)
+  const [context, setContext] = useState('')
+  const [saving, setSaving] = useState(false)
+
+  const current = images[idx]
+  if (!current) { onClose(); return null }
+
+  const advance = () => {
+    setContext('')
+    if (idx < images.length - 1) setIdx(i => i + 1)
+    else onClose()
+  }
+
+  const handleSave = async () => {
+    if (!context.trim()) return
+    setSaving(true)
+    await onUpdate(current.id, { ocr_text: context.trim() })
+    setSaving(false)
+    advance()
+  }
+
+  return (
+    <div style={{ position: 'fixed', inset: 0, zIndex: 400, display: 'flex', flexDirection: 'column', justifyContent: 'flex-end', background: 'rgba(0,0,0,0.6)' }} onClick={onClose}>
+      <div style={{ background: 'var(--surface)', borderRadius: '20px 20px 0 0', maxWidth: 430, margin: '0 auto', width: '100%', maxHeight: '90dvh', overflowY: 'auto' }} onClick={e => e.stopPropagation()}>
+        <div style={{ padding: '16px 20px 0' }}>
+          <div style={{ width: 36, height: 4, background: 'var(--border)', borderRadius: 2, margin: '0 auto 12px' }} />
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+            <div style={{ fontSize: 15, fontWeight: 600 }}>Add context</div>
+            <span style={{ fontSize: 12, color: 'var(--muted)', background: 'var(--bg)', padding: '3px 10px', borderRadius: 20 }}>{idx + 1} / {images.length}</span>
+          </div>
+        </div>
+
+        <img src={current.file_url} alt={current.title} style={{ width: '100%', maxHeight: 220, objectFit: 'cover' }} />
+
+        <div style={{ padding: '14px 20px calc(16px + env(safe-area-inset-bottom))' }}>
+          <div style={{ fontSize: 14, fontWeight: 500, marginBottom: 4 }}>{current.title}</div>
+          {current.ocr_text && <div style={{ fontSize: 12, color: 'var(--muted)', marginBottom: 10 }}>{current.ocr_text}</div>}
+
+          <div style={{ fontSize: 11, color: 'var(--amber-dark)', fontWeight: 600, marginBottom: 6 }}>
+            <i className="ti ti-help-circle" style={{ marginRight: 4 }} /> What's in this image?
+          </div>
+          <textarea
+            className="input"
+            placeholder="Describe what this image is about…"
+            value={context}
+            onChange={e => setContext(e.target.value)}
+            style={{ minHeight: 70, marginBottom: 12, fontSize: 14 }}
+            autoFocus
+          />
+          <div style={{ display: 'flex', gap: 8 }}>
+            <button className="btn btn-primary" style={{ flex: 1, gap: 6 }} onClick={handleSave} disabled={!context.trim() || saving}>
+              {saving ? <><div className="spinner" style={{ width: 14, height: 14, borderTopColor: '#fff' }} /> Saving…</> : `Save & ${idx < images.length - 1 ? 'Next' : 'Done'}`}
+            </button>
+            <button className="btn btn-ghost" onClick={advance}>Skip</button>
           </div>
         </div>
       </div>
@@ -430,23 +502,26 @@ function AddVaultModal({ onClose, onSave }) {
 export function Vault() {
   const { vaultItems, addVaultItem, deleteVaultItem, updateVaultItem, loading } = useStore()
   const [cat, setCat]       = useState('all')
-  const [reviewMode, setReviewMode] = useState(false)
   const [search, setSearch] = useState('')
   const [showSearch, setShowSearch] = useState(false)
   const [showAdd, setShowAdd]   = useState(false)
+  const [showReview, setShowReview] = useState(false)
+  const [uploading, setUploading] = useState(false)
   const [selected, setSelected] = useState(null)
   const [toast, showToast] = useToast()
 
-  const needsReview = vaultItems.filter(v => v.type === 'image' && (!v.ocr_text || isGenericTitle(v.title)))
+  const unclearedImages = vaultItems.filter(v => v.type === 'image' && (!v.ocr_text || v.ocr_text.trim().length < 25))
 
-  const filtered = (reviewMode ? needsReview : vaultItems).filter(v => {
+  const filtered = vaultItems.filter(v => {
     if (cat !== 'all' && v.type !== cat) return false
     if (search && !v.title?.toLowerCase().includes(search.toLowerCase()) && !v.ocr_text?.toLowerCase().includes(search.toLowerCase())) return false
     return true
   })
 
   const handleAdd = async (item) => {
+    setUploading(true)
     const { error } = await addVaultItem(item)
+    setUploading(false)
     if (!error) showToast('Saved to vault')
     else showToast('Save failed')
   }
@@ -487,57 +562,48 @@ export function Vault() {
       )}
 
       <div style={{ padding: '0 16px' }}>
-        {needsReview.length > 0 && (
-          <div style={{ marginTop: 10, padding: '14px 16px', borderRadius: 'var(--r)', background: 'var(--accent-soft)', border: '1px solid var(--accent-mid)', display: 'flex', alignItems: 'center', gap: 12 }}>
-            <div style={{ width: 38, height: 38, borderRadius: 10, background: 'var(--accent)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-              <i className="ti ti-photo-scan" style={{ fontSize: 18, color: '#fff' }} />
-            </div>
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ fontSize: 14, fontWeight: 600 }}>Review your captured images</div>
-              <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 1 }}>Give context or sort them to keep everything organised</div>
-            </div>
-            <button
-              onClick={() => { setReviewMode(true); setCat('all') }}
-              style={{ flexShrink: 0, display: 'flex', alignItems: 'center', gap: 4, padding: '7px 12px', borderRadius: 'var(--r-full)', border: 'none', background: 'var(--accent)', color: '#fff', fontSize: 12, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}
-            >
-              Review now <i className="ti ti-chevron-right" style={{ fontSize: 13 }} />
-            </button>
-          </div>
-        )}
-
-        {reviewMode && (
-          <div style={{ marginTop: 10, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-            <div style={{ fontSize: 12, color: 'var(--accent)', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 5 }}>
-              <i className="ti ti-photo-scan" style={{ fontSize: 14 }} /> Reviewing {needsReview.length} uncontextualised item{needsReview.length !== 1 ? 's' : ''}
-            </div>
-            <button onClick={() => setReviewMode(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--muted)', fontSize: 12, fontFamily: 'inherit' }}>Exit</button>
-          </div>
-        )}
-
         <div style={{ display: 'flex', gap: 6, padding: '10px 0', overflowX: 'auto', scrollbarWidth: 'none' }}>
           {VAULT_CATS.map(c => (
-            <button key={c} className={`pill ${!reviewMode && cat === c ? 'active' : ''}`} onClick={() => { setCat(c); setReviewMode(false) }} style={{ textTransform: 'capitalize' }}>{c}</button>
+            <button key={c} className={`pill ${cat === c ? 'active' : ''}`} onClick={() => setCat(c)} style={{ textTransform: 'capitalize' }}>{c}</button>
           ))}
         </div>
       </div>
 
       <div className="page-scroll" style={{ paddingTop: 4 }}>
-        {!loading && filtered.length > 0 && (
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
-            <div className="section-label" style={{ margin: 0 }}>{reviewMode ? 'Needs review' : 'Recent'}</div>
-            {!reviewMode && !search && <span onClick={() => setCat('all')} style={{ fontSize: 12, color: 'var(--accent)', fontWeight: 500, cursor: 'pointer' }}>See all</span>}
-          </div>
+        {/* Review banner */}
+        {unclearedImages.length > 0 && (
+          <button onClick={() => setShowReview(true)} style={{ display: 'flex', alignItems: 'center', gap: 14, width: '100%', marginBottom: 14, padding: '14px 16px', background: 'linear-gradient(135deg, var(--accent-soft), var(--purple-soft))', border: '1.5px solid var(--accent-mid)', borderRadius: 'var(--r)', cursor: 'pointer', fontFamily: 'inherit', textAlign: 'left' }}>
+            <div style={{ width: 42, height: 42, borderRadius: 12, background: 'var(--accent)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+              <i className="ti ti-photo-scan" style={{ fontSize: 22, color: '#fff' }} />
+            </div>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--text)', display: 'flex', alignItems: 'center', gap: 6 }}>
+                Review your captured images
+                <span style={{ background: 'var(--accent)', color: '#fff', fontSize: 10, fontWeight: 700, padding: '1px 7px', borderRadius: 10 }}>{unclearedImages.length}</span>
+              </div>
+              <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 2 }}>Give context or sort them to keep everything organised.</div>
+            </div>
+            <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--accent)', whiteSpace: 'nowrap', display: 'flex', alignItems: 'center', gap: 4 }}>
+              Review now <i className="ti ti-chevron-right" style={{ fontSize: 14 }} />
+            </span>
+          </button>
         )}
-        {loading ? (
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-            {Array.from({ length: 6 }).map((_, i) => <SkeletonVaultCard key={i} />)}
-          </div>
-        ) : filtered.length === 0 ? (
+
+        {filtered.length === 0 && !uploading ? (
           <div style={{ textAlign: 'center', padding: '40px 0', color: 'var(--muted)', fontSize: 13 }}>
-            {reviewMode ? 'Nothing left to review — all caught up.' : search ? 'No items match.' : 'Nothing in the vault yet. Tap + to add.'}
+            {search ? 'No items match.' : 'Nothing in the vault yet. Tap + to add.'}
           </div>
         ) : (
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+            {uploading && (
+              <div style={{ background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: 'var(--r)', overflow: 'hidden' }}>
+                <div className="shimmer-box" style={{ height: 90, borderRadius: 0 }} />
+                <div style={{ padding: '8px 10px' }}>
+                  <div className="shimmer-box" style={{ height: 12, width: '75%', marginBottom: 6 }} />
+                  <div className="shimmer-box" style={{ height: 10, width: '50%' }} />
+                </div>
+              </div>
+            )}
             {filtered.map(item => {
               const meta = VAULT_META[item.type] || VAULT_META.note
               const isVoice = item.tags?.includes('voice')
@@ -605,6 +671,7 @@ export function Vault() {
 
       {selected && <VaultItemModal item={selected} onClose={() => setSelected(null)} onDelete={handleDelete} onUpdate={handleUpdate} />}
       {showAdd && <AddVaultModal onClose={() => setShowAdd(false)} onSave={handleAdd} />}
+      {showReview && unclearedImages.length > 0 && <ReviewModal images={unclearedImages} onUpdate={handleUpdate} onClose={() => setShowReview(false)} />}
       {toast && <div className="toast">{toast}</div>}
     </div>
   )
@@ -631,6 +698,8 @@ export function Journal() {
   const [recording,    setRecording]    = useState(false)
   const [promotedTasks, setPromotedTasks] = useState({})
   const [promotingSaving, setPromotingSaving] = useState(false)
+  const [showSearch,   setShowSearch]   = useState(false)
+  const [searchQuery,  setSearchQuery]  = useState('')
   const [toast, showToast] = useToast()
   const recognizerRef = useRef(null)
   const imgInputRef   = useRef(null)
@@ -640,7 +709,7 @@ export function Journal() {
   const weekDays = Array.from({ length: 7 }, (_, i) => { const d = new Date(today); d.setDate(today.getDate() - 3 + i); return d })
   const [selectedDay, setSelectedDay] = useState(3)
   const selectedDate = weekDays[selectedDay]
-  const dateStr = selectedDate.toISOString().split('T')[0]
+  const dateStr = `${selectedDate.getFullYear()}-${String(selectedDate.getMonth()+1).padStart(2,'0')}-${String(selectedDate.getDate()).padStart(2,'0')}`
 
   useEffect(() => {
     setLogEntries([]); setNewEntryText(''); setEditingId(null)
@@ -810,16 +879,23 @@ export function Journal() {
     else showToast('Save failed')
   }
 
+  const visibleEntries = searchQuery.trim()
+    ? logEntries.filter(e => e.text.toLowerCase().includes(searchQuery.toLowerCase()))
+    : logEntries
+
   return (
     <div className="page">
-      <div style={{ padding: '14px 16px 0' }}>
+      <div style={{ padding: '14px 16px 0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <h2>Journal</h2>
+        <button onClick={() => { setShowSearch(s => !s); setSearchQuery('') }} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 4, color: showSearch ? 'var(--accent)' : 'var(--muted)' }}>
+          <i className="ti ti-search" style={{ fontSize: 20 }} />
+        </button>
       </div>
 
       {/* Week strip */}
       <div style={{ display: 'flex', gap: 4, padding: '10px 16px 0', overflowX: 'auto', scrollbarWidth: 'none' }}>
         {weekDays.map((d, i) => (
-          <div key={i} onClick={() => setSelectedDay(i)} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4, cursor: 'pointer', minWidth: 36 }}>
+          <div key={i} onClick={() => { setSelectedDay(i); setSearchQuery(''); setShowSearch(false) }} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4, cursor: 'pointer', minWidth: 36 }}>
             <div style={{ fontSize: 10, color: 'var(--muted)' }}>{d.toLocaleDateString('en', { weekday: 'short' })}</div>
             <div style={{ width: 30, height: 30, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, fontWeight: 500, background: i === selectedDay ? 'var(--accent)' : 'transparent', color: i === selectedDay ? '#fff' : 'var(--muted)' }}>
               {d.getDate()}
@@ -828,30 +904,23 @@ export function Journal() {
         ))}
       </div>
 
-      <div className="page-scroll" style={{ paddingTop: 8 }}>
-        {/* Day at a glance — 2×2 tiles */}
-        <div className="section-label">Day at a glance</div>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-          {[
-            { icon: 'ti-check', color: 'var(--green)', bg: 'var(--green-soft)', num: dayDone.length, label: 'Tasks', sub: 'completed' },
-            { icon: 'ti-bulb',  color: 'var(--purple)', bg: 'var(--purple-soft)', num: dayIdeas.length, label: 'Ideas', sub: 'captured' },
-            { icon: 'ti-camera', color: 'var(--amber)', bg: 'var(--amber-soft)', num: dayCaptures.length, label: 'Captures', sub: 'saved' },
-            { icon: 'ti-currency-rupee', color: 'var(--accent)', bg: 'var(--accent-soft)', num: `₹${Math.round(totalSpent)||0}`, label: 'Expenses', sub: 'added' },
-          ].map((tile, i) => (
-            <div key={i} style={{ background: 'var(--bg)', borderRadius: 'var(--r)', padding: '14px', border: '1px solid var(--border)', display: 'flex', flexDirection: 'column', gap: 6 }}>
-              <div style={{ width: 32, height: 32, borderRadius: 8, background: tile.bg, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                <i className={`ti ${tile.icon}`} style={{ fontSize: 16, color: tile.color }} />
-              </div>
-              <div style={{ fontSize: 22, fontWeight: 700, color: 'var(--text)' }}>{tile.num}</div>
-              <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text)' }}>{tile.label}</div>
-              <div style={{ fontSize: 11, color: 'var(--muted)' }}>{tile.sub}</div>
-            </div>
-          ))}
+      {showSearch && (
+        <div style={{ padding: '8px 16px 0' }}>
+          <div className="search-bar">
+            <i className="ti ti-search" />
+            <input placeholder="Search entries…" value={searchQuery} onChange={e => setSearchQuery(e.target.value)} autoFocus />
+            {searchQuery && <button onClick={() => setSearchQuery('')} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 2, color: 'var(--muted)' }}><i className="ti ti-x" style={{ fontSize: 14 }} /></button>}
+          </div>
         </div>
+      )}
 
+      <div className="page-scroll" style={{ paddingTop: 8 }}>
         {/* ── Log Entries ── */}
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 20, marginBottom: 10 }}>
-          <div className="section-label" style={{ margin: 0 }}>Log entries {logEntries.length > 0 && <span style={{ color: 'var(--hint)', fontWeight: 400 }}>({logEntries.length})</span>}</div>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 8, marginBottom: 10 }}>
+          <div className="section-label" style={{ margin: 0 }}>
+            Log entries {logEntries.length > 0 && <span style={{ color: 'var(--hint)', fontWeight: 400 }}>({logEntries.length})</span>}
+          </div>
+          {searchQuery && <span style={{ fontSize: 11, color: 'var(--muted)' }}>{visibleEntries.length} match{visibleEntries.length !== 1 ? 'es' : ''}</span>}
         </div>
 
         {recording && (
@@ -861,8 +930,12 @@ export function Journal() {
           </div>
         )}
 
+        {searchQuery && visibleEntries.length === 0 && (
+          <div style={{ textAlign: 'center', padding: '20px 0', color: 'var(--hint)', fontSize: 13 }}>No entries match "{searchQuery}"</div>
+        )}
+
         {/* Existing entries — chronological */}
-        {logEntries.map((entry, i) => (
+        {visibleEntries.map((entry, i) => (
           <div key={entry.id} className="card" style={{ marginBottom: 8, padding: '10px 14px' }}>
             {editingId === entry.id ? (
               <div>
@@ -1368,6 +1441,8 @@ export function IdeaLab() {
   const [showBrainstorm, setShowBrainstorm] = useState(false)
   const [showSearch, setShowSearch] = useState(false)
   const [search,     setSearch]     = useState('')
+  const [ideaTaskInput, setIdeaTaskInput] = useState('')
+  const [ideaTaskSaving, setIdeaTaskSaving] = useState(false)
   const [toast, showToast] = useToast()
 
   const handleExpand = async (idea) => {
@@ -1398,6 +1473,17 @@ export function IdeaLab() {
     setSelected(prev => prev ? { ...prev, status } : prev)
     showToast('Status updated')
   }
+
+  const handleAddIdeaTask = async () => {
+    if (!ideaTaskInput.trim() || !selected) return
+    setIdeaTaskSaving(true)
+    await addTask({ title: ideaTaskInput.trim(), status: 'todo', progress: 0, source: 'idea', notes: `[idea:${selected.id}]` })
+    setIdeaTaskInput('')
+    setIdeaTaskSaving(false)
+    showToast('Task added')
+  }
+
+  const ideaTasks = selected ? tasks.filter(t => t.notes?.includes(`[idea:${selected.id}]`)) : []
 
   const filteredIdeas = ideas.filter(i => {
     if (search) return i.title.toLowerCase().includes(search.toLowerCase()) || i.body?.toLowerCase().includes(search.toLowerCase())
@@ -1437,6 +1523,40 @@ export function IdeaLab() {
                 {selected.tags.map(t => <span key={t} className="pill" style={{ fontSize: 11 }}>{t}</span>)}
               </div>
             )}
+          </div>
+
+          {/* Tasks for this idea */}
+          <div style={{ marginBottom: 16 }}>
+            <div className="section-label" style={{ marginBottom: 10 }}>Tasks</div>
+            {ideaTasks.length > 0 && (
+              <div style={{ marginBottom: 10 }}>
+                {ideaTasks.map(t => (
+                  <div key={t.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px', background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: 'var(--r-sm)', marginBottom: 6 }}>
+                    <i className={`ti ${t.status === 'done' ? 'ti-circle-check' : t.status === 'in_progress' ? 'ti-loader' : 'ti-circle'}`} style={{ fontSize: 16, color: t.status === 'done' ? 'var(--green)' : t.status === 'in_progress' ? 'var(--accent)' : 'var(--border-strong)', flexShrink: 0 }} />
+                    <span style={{ flex: 1, fontSize: 13, color: t.status === 'done' ? 'var(--muted)' : 'var(--text)', textDecoration: t.status === 'done' ? 'line-through' : 'none' }}>{t.title}</span>
+                    {t.status !== 'done' && <span style={{ fontSize: 10, color: 'var(--muted)' }}>{t.progress}%</span>}
+                  </div>
+                ))}
+              </div>
+            )}
+            <div style={{ display: 'flex', gap: 8 }}>
+              <input
+                className="input"
+                placeholder="Add a task for this idea…"
+                value={ideaTaskInput}
+                onChange={e => setIdeaTaskInput(e.target.value)}
+                onKeyDown={e => { if (e.key === 'Enter') handleAddIdeaTask() }}
+                style={{ flex: 1, fontSize: 14 }}
+              />
+              <button
+                className="btn btn-primary"
+                onClick={handleAddIdeaTask}
+                disabled={!ideaTaskInput.trim() || ideaTaskSaving}
+                style={{ padding: '12px 14px', minWidth: 46 }}
+              >
+                {ideaTaskSaving ? <div className="spinner" style={{ width: 14, height: 14, borderTopColor: '#fff' }} /> : <i className="ti ti-plus" style={{ fontSize: 16 }} />}
+              </button>
+            </div>
           </div>
 
           <button className="btn btn-ghost" style={{ width: '100%', gap: 8, marginBottom: 16 }} onClick={() => handleExpand(selected)} disabled={loading}>
