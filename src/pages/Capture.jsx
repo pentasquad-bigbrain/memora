@@ -139,39 +139,32 @@ function ImageTasksEditor({ imgAnalysis, imgDataUrl, onSave, onBack }) {
   )
 }
 
-// Photo source picker bottom sheet
+// Photo source picker bottom sheet. File inputs live in the parent (always mounted)
+// so the native picker isn't torn down mid-selection when the sheet closes.
 function PhotoSheet({ onCamera, onGallery, onFiles, onClose }) {
-  const cameraRef = useRef(null)
-  const galleryRef = useRef(null)
-  const filesRef = useRef(null)
   return (
-    <>
-      <input ref={cameraRef}  type="file" accept="image/*" capture="environment" style={{ display:'none' }} onChange={onCamera} />
-      <input ref={galleryRef} type="file" accept="image/*"                       style={{ display:'none' }} onChange={onGallery} />
-      <input ref={filesRef}   type="file" accept="image/*,application/pdf"      style={{ display:'none' }} onChange={onFiles} />
-      <div style={{ position:'fixed', inset:0, zIndex:400, display:'flex', flexDirection:'column', justifyContent:'flex-end', background:'rgba(0,0,0,0.45)' }} onClick={onClose}>
-        <div style={{ background:'var(--surface)', borderRadius:'24px 24px 0 0', maxWidth:430, margin:'0 auto', width:'100%', padding:'12px 0 calc(20px + env(safe-area-inset-bottom))' }} onClick={e=>e.stopPropagation()}>
-          <div style={{ width:36, height:4, background:'var(--border)', borderRadius:2, margin:'0 auto 16px' }} />
-          <div style={{ fontSize:14, fontWeight:600, color:'var(--muted)', textAlign:'center', marginBottom:8 }}>Add photo from</div>
-          {[
-            { icon:'ti-camera', color:'var(--accent)', bg:'var(--accent-soft)', label:'Camera', sub:'Take a new photo', action:()=>cameraRef.current?.click() },
-            { icon:'ti-photo',  color:'var(--purple)', bg:'var(--purple-soft)', label:'Gallery', sub:'Choose from gallery', action:()=>galleryRef.current?.click() },
-            { icon:'ti-folder', color:'var(--amber)',  bg:'var(--amber-soft)',  label:'Files', sub:'Browse files', action:()=>filesRef.current?.click() },
-          ].map(opt=>(
-            <button key={opt.label} onClick={()=>{opt.action();onClose()}} style={{ display:'flex', alignItems:'center', gap:14, width:'100%', padding:'14px 20px', background:'none', border:'none', cursor:'pointer', fontFamily:'inherit', textAlign:'left' }}>
-              <div style={{ width:44, height:44, borderRadius:12, background:opt.bg, display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>
-                <i className={`ti ${opt.icon}`} style={{ fontSize:22, color:opt.color }} />
-              </div>
-              <div>
-                <div style={{ fontSize:15, fontWeight:500, color:'var(--text)' }}>{opt.label}</div>
-                <div style={{ fontSize:12, color:'var(--muted)' }}>{opt.sub}</div>
-              </div>
-            </button>
-          ))}
-          <button onClick={onClose} style={{ display:'block', width:'calc(100% - 32px)', margin:'8px 16px 0', padding:'14px', background:'var(--bg)', border:'1px solid var(--border)', borderRadius:'var(--r)', fontSize:15, fontWeight:500, cursor:'pointer', fontFamily:'inherit', color:'var(--muted)' }}>Cancel</button>
-        </div>
+    <div style={{ position:'fixed', inset:0, zIndex:400, display:'flex', flexDirection:'column', justifyContent:'flex-end', background:'rgba(0,0,0,0.45)' }} onClick={onClose}>
+      <div style={{ background:'var(--surface)', borderRadius:'24px 24px 0 0', maxWidth:430, margin:'0 auto', width:'100%', padding:'12px 0 calc(20px + env(safe-area-inset-bottom))' }} onClick={e=>e.stopPropagation()}>
+        <div style={{ width:36, height:4, background:'var(--border)', borderRadius:2, margin:'0 auto 16px' }} />
+        <div style={{ fontSize:14, fontWeight:600, color:'var(--muted)', textAlign:'center', marginBottom:8 }}>Add photo from</div>
+        {[
+          { icon:'ti-camera', color:'var(--accent)', bg:'var(--accent-soft)', label:'Camera', sub:'Take a new photo', action:onCamera },
+          { icon:'ti-photo',  color:'var(--purple)', bg:'var(--purple-soft)', label:'Gallery', sub:'Choose from gallery', action:onGallery },
+          { icon:'ti-folder', color:'var(--amber)',  bg:'var(--amber-soft)',  label:'Files', sub:'Browse files', action:onFiles },
+        ].map(opt=>(
+          <button key={opt.label} onClick={opt.action} style={{ display:'flex', alignItems:'center', gap:14, width:'100%', padding:'14px 20px', background:'none', border:'none', cursor:'pointer', fontFamily:'inherit', textAlign:'left' }}>
+            <div style={{ width:44, height:44, borderRadius:12, background:opt.bg, display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>
+              <i className={`ti ${opt.icon}`} style={{ fontSize:22, color:opt.color }} />
+            </div>
+            <div>
+              <div style={{ fontSize:15, fontWeight:500, color:'var(--text)' }}>{opt.label}</div>
+              <div style={{ fontSize:12, color:'var(--muted)' }}>{opt.sub}</div>
+            </div>
+          </button>
+        ))}
+        <button onClick={onClose} style={{ display:'block', width:'calc(100% - 32px)', margin:'8px 16px 0', padding:'14px', background:'var(--bg)', border:'1px solid var(--border)', borderRadius:'var(--r)', fontSize:15, fontWeight:500, cursor:'pointer', fontFamily:'inherit', color:'var(--muted)' }}>Cancel</button>
       </div>
-    </>
+    </div>
   )
 }
 
@@ -191,6 +184,9 @@ export default function Capture() {
   const [imgDataUrl, setImgDataUrl]   = useState(null)
   const [imgAnalysis, setImgAnalysis] = useState(null)
   const [showPhotoSheet, setShowPhotoSheet] = useState(false)
+  const cameraInputRef  = useRef(null)
+  const galleryInputRef = useRef(null)
+  const filesInputRef   = useRef(null)
   const [toast, setToast] = useState(null)
   const showToast = (msg) => { setToast(msg); setTimeout(()=>setToast(null),2500) }
 
@@ -546,7 +542,19 @@ export default function Capture() {
         })}
       </div>
 
-      {showPhotoSheet && <PhotoSheet onCamera={handleImageFile} onGallery={handleImageFile} onFiles={handleImageFile} onClose={()=>setShowPhotoSheet(false)} />}
+      {/* Always mounted so the native file picker isn't torn down while open */}
+      <input ref={cameraInputRef}  type="file" accept="image/*" capture="environment" style={{ display:'none' }} onChange={handleImageFile} />
+      <input ref={galleryInputRef} type="file" accept="image/*"                       style={{ display:'none' }} onChange={handleImageFile} />
+      <input ref={filesInputRef}   type="file" accept="image/*,application/pdf"      style={{ display:'none' }} onChange={handleImageFile} />
+
+      {showPhotoSheet && (
+        <PhotoSheet
+          onCamera={()=>{ setShowPhotoSheet(false); cameraInputRef.current?.click() }}
+          onGallery={()=>{ setShowPhotoSheet(false); galleryInputRef.current?.click() }}
+          onFiles={()=>{ setShowPhotoSheet(false); filesInputRef.current?.click() }}
+          onClose={()=>setShowPhotoSheet(false)}
+        />
+      )}
       {toast&&<div className="toast">{toast}</div>}
     </div>
   )

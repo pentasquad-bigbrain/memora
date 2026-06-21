@@ -3,6 +3,7 @@ import { useStore } from '../lib/store'
 import { expandIdea, generateJournalSummary, brainstormIdeas, analyzeImage } from '../lib/groq'
 import { formatDistanceToNow, format } from 'date-fns'
 import Tesseract from 'tesseract.js'
+import { SkeletonVaultCard } from '../components/shared/Skeleton'
 
 // ── Shared helpers ────────────────────────────────────────────
 const AVATAR_COLORS = ['avatar-blue', 'avatar-green', 'avatar-purple', 'avatar-amber', 'avatar-red']
@@ -427,15 +428,18 @@ function AddVaultModal({ onClose, onSave }) {
 }
 
 export function Vault() {
-  const { vaultItems, addVaultItem, deleteVaultItem, updateVaultItem } = useStore()
+  const { vaultItems, addVaultItem, deleteVaultItem, updateVaultItem, loading } = useStore()
   const [cat, setCat]       = useState('all')
+  const [reviewMode, setReviewMode] = useState(false)
   const [search, setSearch] = useState('')
   const [showSearch, setShowSearch] = useState(false)
   const [showAdd, setShowAdd]   = useState(false)
   const [selected, setSelected] = useState(null)
   const [toast, showToast] = useToast()
 
-  const filtered = vaultItems.filter(v => {
+  const needsReview = vaultItems.filter(v => v.type === 'image' && (!v.ocr_text || isGenericTitle(v.title)))
+
+  const filtered = (reviewMode ? needsReview : vaultItems).filter(v => {
     if (cat !== 'all' && v.type !== cat) return false
     if (search && !v.title?.toLowerCase().includes(search.toLowerCase()) && !v.ocr_text?.toLowerCase().includes(search.toLowerCase())) return false
     return true
@@ -480,17 +484,48 @@ export function Vault() {
       )}
 
       <div style={{ padding: '0 16px' }}>
+        {needsReview.length > 0 && (
+          <div style={{ marginTop: 10, padding: '14px 16px', borderRadius: 'var(--r)', background: 'var(--accent-soft)', border: '1px solid var(--accent-mid)', display: 'flex', alignItems: 'center', gap: 12 }}>
+            <div style={{ width: 38, height: 38, borderRadius: 10, background: 'var(--accent)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+              <i className="ti ti-photo-scan" style={{ fontSize: 18, color: '#fff' }} />
+            </div>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ fontSize: 14, fontWeight: 600 }}>Review your captured images</div>
+              <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 1 }}>Give context or sort them to keep everything organised</div>
+            </div>
+            <button
+              onClick={() => { setReviewMode(true); setCat('all') }}
+              style={{ flexShrink: 0, display: 'flex', alignItems: 'center', gap: 4, padding: '7px 12px', borderRadius: 'var(--r-full)', border: 'none', background: 'var(--accent)', color: '#fff', fontSize: 12, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}
+            >
+              Review now <i className="ti ti-chevron-right" style={{ fontSize: 13 }} />
+            </button>
+          </div>
+        )}
+
+        {reviewMode && (
+          <div style={{ marginTop: 10, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <div style={{ fontSize: 12, color: 'var(--accent)', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 5 }}>
+              <i className="ti ti-photo-scan" style={{ fontSize: 14 }} /> Reviewing {needsReview.length} uncontextualised item{needsReview.length !== 1 ? 's' : ''}
+            </div>
+            <button onClick={() => setReviewMode(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--muted)', fontSize: 12, fontFamily: 'inherit' }}>Exit</button>
+          </div>
+        )}
+
         <div style={{ display: 'flex', gap: 6, padding: '10px 0', overflowX: 'auto', scrollbarWidth: 'none' }}>
           {VAULT_CATS.map(c => (
-            <button key={c} className={`pill ${cat === c ? 'active' : ''}`} onClick={() => setCat(c)} style={{ textTransform: 'capitalize' }}>{c}</button>
+            <button key={c} className={`pill ${!reviewMode && cat === c ? 'active' : ''}`} onClick={() => { setCat(c); setReviewMode(false) }} style={{ textTransform: 'capitalize' }}>{c}</button>
           ))}
         </div>
       </div>
 
       <div className="page-scroll" style={{ paddingTop: 4 }}>
-        {filtered.length === 0 ? (
+        {loading ? (
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+            {Array.from({ length: 6 }).map((_, i) => <SkeletonVaultCard key={i} />)}
+          </div>
+        ) : filtered.length === 0 ? (
           <div style={{ textAlign: 'center', padding: '40px 0', color: 'var(--muted)', fontSize: 13 }}>
-            {search ? 'No items match.' : 'Nothing in the vault yet. Tap + to add.'}
+            {reviewMode ? 'Nothing left to review — all caught up.' : search ? 'No items match.' : 'Nothing in the vault yet. Tap + to add.'}
           </div>
         ) : (
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
@@ -574,7 +609,13 @@ export function Journal() {
       const summary = entry.auto_summary || null
       if (summary) {
         const { journal_images, log_entries, ...rest } = summary
-        setJournalImages(journal_images || [])
+        // Legacy entries stored images as plain base64 strings; normalise to objects.
+        const normImages = (journal_images || []).map(img =>
+          typeof img === 'string'
+            ? { id: `${Date.now()}-${Math.random().toString(36).slice(2,7)}`, url: img, description: '', location: null, timestamp: entry.date || new Date().toISOString() }
+            : img
+        )
+        setJournalImages(normImages)
         // Restore log entries; fall back to personal_note as first entry
         if (log_entries?.length) {
           setLogEntries(log_entries)
@@ -648,12 +689,34 @@ export function Journal() {
     if (!files.length) return
     files.forEach(file => {
       const reader = new FileReader()
-      reader.onload = (ev) => setJournalImages(prev => [...prev, ev.target.result])
+      reader.onload = (ev) => {
+        const id = `${Date.now()}-${Math.random().toString(36).slice(2,7)}`
+        setJournalImages(prev => [...prev, { id, url: ev.target.result, description: '', location: null, timestamp: new Date().toISOString() }])
+      }
       reader.readAsDataURL(file)
     })
     e.target.value = ''
   }
-  const removeImage = (idx) => setJournalImages(prev => prev.filter((_, i) => i !== idx))
+  const removeImage = (id) => setJournalImages(prev => prev.filter(img => img.id !== id))
+  const updateImage = (id, patch) => setJournalImages(prev => prev.map(img => img.id === id ? { ...img, ...patch } : img))
+  const tagImageLocation = (id) => {
+    if (!navigator.geolocation) { showToast('Location not supported'); return }
+    updateImage(id, { location: 'Locating…' })
+    navigator.geolocation.getCurrentPosition(
+      async (pos) => {
+        const { latitude, longitude } = pos.coords
+        try {
+          const res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}`)
+          const data = await res.json()
+          const label = data?.address?.suburb || data?.address?.city || data?.address?.town || data?.display_name?.split(',')[0] || `${latitude.toFixed(3)}, ${longitude.toFixed(3)}`
+          updateImage(id, { location: label })
+        } catch {
+          updateImage(id, { location: `${latitude.toFixed(3)}, ${longitude.toFixed(3)}` })
+        }
+      },
+      () => { updateImage(id, { location: null }); showToast('Could not get location') }
+    )
+  }
 
   // ── AI summary — passes all entries ──────────────
   const handleGenerate = async () => {
@@ -840,13 +903,38 @@ export function Journal() {
         {journalImages.length > 0 && (
           <div style={{ marginTop: 10, marginBottom: 4 }}>
             <div style={{ fontSize: 10, color: 'var(--hint)', marginBottom: 6 }}>Photos · journal only</div>
-            <div style={{ display: 'flex', gap: 8, overflowX: 'auto', scrollbarWidth: 'none', paddingBottom: 4 }}>
-              {journalImages.map((src, i) => (
-                <div key={i} style={{ position: 'relative', flexShrink: 0 }}>
-                  <img src={src} alt="" style={{ width: 90, height: 90, objectFit: 'cover', borderRadius: 'var(--r-sm)', display: 'block' }} />
-                  <button onClick={() => removeImage(i)} style={{ position: 'absolute', top: 4, right: 4, width: 20, height: 20, borderRadius: '50%', background: 'rgba(0,0,0,0.55)', border: 'none', color: '#fff', fontSize: 10, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                    <i className="ti ti-x" style={{ fontSize: 10 }} />
-                  </button>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+              {journalImages.map(img => (
+                <div key={img.id} style={{ display: 'flex', gap: 10, background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: 'var(--r)', padding: 8 }}>
+                  <div style={{ position: 'relative', flexShrink: 0 }}>
+                    <img src={img.url} alt="" style={{ width: 72, height: 72, objectFit: 'cover', borderRadius: 'var(--r-sm)', display: 'block' }} />
+                    <button onClick={() => removeImage(img.id)} style={{ position: 'absolute', top: -6, right: -6, width: 20, height: 20, borderRadius: '50%', background: 'rgba(0,0,0,0.6)', border: 'none', color: '#fff', fontSize: 10, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                      <i className="ti ti-x" style={{ fontSize: 10 }} />
+                    </button>
+                  </div>
+                  <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 5 }}>
+                    <input
+                      className="input"
+                      placeholder="Add a description…"
+                      value={img.description}
+                      onChange={e => updateImage(img.id, { description: e.target.value })}
+                      style={{ fontSize: 12, padding: '6px 9px', minHeight: 'auto' }}
+                    />
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                      <span style={{ fontSize: 10, color: 'var(--muted)', display: 'flex', alignItems: 'center', gap: 3 }}>
+                        <i className="ti ti-clock" style={{ fontSize: 11 }} /> {format(new Date(img.timestamp), 'd MMM · h:mm a')}
+                      </span>
+                      {img.location ? (
+                        <span onClick={() => tagImageLocation(img.id)} style={{ fontSize: 10, color: 'var(--accent)', display: 'flex', alignItems: 'center', gap: 3, cursor: 'pointer' }}>
+                          <i className="ti ti-map-pin" style={{ fontSize: 11 }} /> {img.location}
+                        </span>
+                      ) : (
+                        <button onClick={() => tagImageLocation(img.id)} style={{ fontSize: 10, color: 'var(--muted)', background: 'none', border: 'none', cursor: 'pointer', padding: 0, display: 'flex', alignItems: 'center', gap: 3, fontFamily: 'inherit' }}>
+                          <i className="ti ti-map-pin-plus" style={{ fontSize: 11 }} /> Add location
+                        </button>
+                      )}
+                    </div>
+                  </div>
                 </div>
               ))}
             </div>

@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { useStore } from '../lib/store'
 import { generateNudges } from '../lib/groq'
 import { format } from 'date-fns'
+import Skeleton from '../components/shared/Skeleton'
 
 const AVATAR_COLORS = ['avatar-blue','avatar-green','avatar-purple','avatar-amber','avatar-red']
 function initials(name) { return name?.split(' ').map(n=>n[0]).join('').toUpperCase().slice(0,2)||'?' }
@@ -89,7 +90,7 @@ function SearchOverlay({ onClose, tasks, ideas, people, vaultItems, expenses }) 
 
 export default function Home() {
   const navigate = useNavigate()
-  const { user, spaces, activeSpace, setActiveSpace, tasks, ideas, people, expenses, vaultItems, captures, nudges, dismissNudge, addNudges, addSpace } = useStore()
+  const { user, spaces, activeSpace, setActiveSpace, tasks, ideas, people, expenses, vaultItems, captures, nudges, dismissNudge, addNudges, addSpace, loading } = useStore()
 
   const [showSpaceModal, setShowSpaceModal] = useState(false)
   const [showSearch, setShowSearch] = useState(false)
@@ -204,7 +205,13 @@ export default function Home() {
         {/* Day at a glance */}
         <div className="section-label" style={{ marginTop:18 }}>Day at a glance</div>
         <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:10 }}>
-          {STAT_TILES.map(s => (
+          {loading ? Array.from({ length:4 }).map((_,i) => (
+            <div key={i} style={{ background:'var(--bg)', borderRadius:'var(--r)', padding:'14px 16px', border:'1px solid var(--border)', display:'flex', flexDirection:'column', gap:8 }}>
+              <Skeleton width={34} height={34} radius={10} />
+              <Skeleton width="50%" height={20} />
+              <Skeleton width="70%" height={12} />
+            </div>
+          )) : STAT_TILES.map(s => (
             <div key={s.label} onClick={()=>navigate(s.dest)} style={{ background:'var(--bg)', borderRadius:'var(--r)', padding:'14px 16px', cursor:'pointer', border:'1px solid var(--border)', display:'flex', flexDirection:'column', gap:4 }}>
               <div style={{ width:34, height:34, borderRadius:10, background:s.bg, display:'flex', alignItems:'center', justifyContent:'center' }}>
                 <i className={`ti ${s.icon}`} style={{ fontSize:18, color:s.color }} />

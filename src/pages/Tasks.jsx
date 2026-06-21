@@ -16,6 +16,87 @@ function dueLabel(due) {
   return { text:format(d,'EEE d MMM · h:mm a'), red:false }
 }
 
+// ── Circular progress ring ─────────────────────────────────────
+function CircularProgress({ progress=0, size=40, stroke=3.5, color='var(--accent)', done=false, onClick }) {
+  const r = (size-stroke)/2
+  const c = 2*Math.PI*r
+  const offset = c - (progress/100)*c
+  return (
+    <button onClick={onClick} style={{ position:'relative', width:size, height:size, flexShrink:0, background:'none', border:'none', cursor:'pointer', padding:0 }}>
+      <svg width={size} height={size} style={{ transform:'rotate(-90deg)' }}>
+        <circle cx={size/2} cy={size/2} r={r} fill="none" stroke="var(--border)" strokeWidth={stroke} />
+        <circle cx={size/2} cy={size/2} r={r} fill="none" stroke={done?'var(--green)':color} strokeWidth={stroke} strokeDasharray={c} strokeDashoffset={done?0:offset} strokeLinecap="round" style={{ transition:'stroke-dashoffset .3s ease' }} />
+      </svg>
+      <div style={{ position:'absolute', inset:0, display:'flex', alignItems:'center', justifyContent:'center' }}>
+        {done
+          ? <i className="ti ti-check" style={{ fontSize:size*0.42, color:'var(--green)' }} />
+          : <span style={{ fontSize:size*0.26, fontWeight:700, color }}>{progress}%</span>}
+      </div>
+    </button>
+  )
+}
+
+// ── Slide-to-complete gesture ───────────────────────────────────
+function SlideToComplete({ onComplete, label='Slide to complete', accentColor='var(--accent)' }) {
+  const trackRef = useRef(null)
+  const [dragX, setDragX] = useState(0)
+  const [dragging, setDragging] = useState(false)
+  const [completing, setCompleting] = useState(false)
+  const maxDragRef = useRef(0)
+  const thumbSize = 30
+
+  const handlePointerDown = (e) => {
+    if (completing) return
+    const track = trackRef.current
+    if (!track) return
+    maxDragRef.current = track.offsetWidth - thumbSize - 6
+    setDragging(true)
+    e.currentTarget.setPointerCapture?.(e.pointerId)
+  }
+  const handlePointerMove = (e) => {
+    if (!dragging) return
+    const track = trackRef.current
+    if (!track) return
+    const rect = track.getBoundingClientRect()
+    const x = e.clientX - rect.left - thumbSize/2
+    setDragX(Math.max(0, Math.min(maxDragRef.current, x)))
+  }
+  const handlePointerUp = () => {
+    if (!dragging) return
+    setDragging(false)
+    const max = maxDragRef.current||1
+    if (dragX/max > 0.7) { setCompleting(true); setDragX(max); onComplete() }
+    else setDragX(0)
+  }
+
+  return (
+    <div
+      ref={trackRef}
+      onPointerDown={handlePointerDown}
+      onPointerMove={handlePointerMove}
+      onPointerUp={handlePointerUp}
+      onPointerCancel={handlePointerUp}
+      style={{ position:'relative', height:32, borderRadius:16, background:'var(--bg)', border:'1px solid var(--border)', overflow:'hidden', touchAction:'none', userSelect:'none' }}
+    >
+      <div style={{ position:'absolute', inset:0, display:'flex', alignItems:'center', justifyContent:'center', gap:4, fontSize:11, fontWeight:600, color:'var(--muted)', pointerEvents:'none' }}>
+        <i className="ti ti-chevrons-right" style={{ fontSize:13 }} /> {label}
+      </div>
+      <div
+        style={{
+          position:'absolute', top:3, left:3, width:thumbSize, height:thumbSize, borderRadius:'50%',
+          background: completing ? 'var(--green)' : accentColor,
+          display:'flex', alignItems:'center', justifyContent:'center',
+          transform:`translateX(${dragX}px)`,
+          transition: dragging ? 'none' : 'transform .25s ease',
+          cursor: completing ? 'default' : 'grab',
+        }}
+      >
+        <i className={`ti ${completing?'ti-check':'ti-chevron-right'}`} style={{ fontSize:14, color:'#fff' }} />
+      </div>
+    </div>
+  )
+}
+
 // ── Redesigned QuickAdd ───────────────────────────────────────
 function QuickAdd({ onAdd, onFindPerson }) {
   const [open,    setOpen]    = useState(false)
@@ -27,7 +108,28 @@ function QuickAdd({ onAdd, onFindPerson }) {
   const [parsing, setParsing] = useState(false)
   const [saving,  setSaving]  = useState(false)
   const [parsed,  setParsed]  = useState(null)
+  const [listening, setListening] = useState(false)
+  const recognitionRef = useRef(null)
   const inputRef = useRef(null)
+  const hasVoiceSupport = typeof window!=='undefined'&&!!(window.SpeechRecognition||window.webkitSpeechRecognition)
+
+  const toggleListening = () => {
+    if (!hasVoiceSupport) return
+    if (listening) { recognitionRef.current?.stop(); setListening(false); return }
+    const SR = window.SpeechRecognition||window.webkitSpeechRecognition
+    const rec = new SR()
+    rec.lang = navigator.language||'en-US'; rec.continuous=false; rec.interimResults=true
+    rec.onresult = (e) => {
+      let text=''
+      for (let i=0;i<e.results.length;i++) text+=e.results[i][0].transcript
+      setTitle(text); setParsed(null)
+    }
+    rec.onerror = () => setListening(false)
+    rec.onend = () => setListening(false)
+    recognitionRef.current = rec
+    setListening(true)
+    rec.start()
+  }
 
   const runAIParse = async (text) => {
     if (!text.trim()) return
@@ -96,17 +198,27 @@ function QuickAdd({ onAdd, onFindPerson }) {
           </div>
 
           {/* Text input */}
-          <div style={{ padding:'0 16px 12px' }}>
+          <div style={{ padding:'0 16px 12px', position:'relative' }}>
             <input
               ref={inputRef}
               className="input"
-              placeholder="What do you want to do?"
+              placeholder={listening?'Listening…':'What do you want to do?'}
               value={title}
               onChange={e=>{setTitle(e.target.value);setParsed(null)}}
               onKeyDown={handleKey}
               disabled={saving||parsing}
-              style={{ background:'var(--bg)', borderColor:'var(--border)' }}
+              style={{ background:'var(--bg)', borderColor:listening?'var(--accent)':'var(--border)', paddingRight:40 }}
             />
+            {hasVoiceSupport && (
+              <button
+                onClick={toggleListening}
+                disabled={saving||parsing}
+                title={listening?'Stop listening':'Speak to add task'}
+                style={{ position:'absolute', right:8, top:'50%', transform:'translateY(-50%)', width:28, height:28, borderRadius:'50%', border:'none', background:listening?'var(--red-soft)':'transparent', cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center' }}
+              >
+                <i className={`ti ${listening?'ti-player-stop':'ti-microphone'}`} style={{ fontSize:15, color:listening?'var(--red)':'var(--muted)' }} />
+              </button>
+            )}
           </div>
 
           {/* AI parsed preview */}
@@ -317,12 +429,6 @@ export default function Tasks() {
     const isDone = task.status==='done'
     await updateTask(task.id, { status:isDone?'todo':'done', progress:isDone?0:100 })
   }
-  const handleProgress = async (e, task) => {
-    e.stopPropagation()
-    const progress = parseInt(e.target.value)
-    const status = progress===100?'done':progress>0?'in_progress':'todo'
-    await updateTask(task.id, { progress, status })
-  }
   const handleUpdate = async (id, updates) => { const { error } = await updateTask(id, updates); if (error) showToast('Update failed') }
   const handleDelete = async (id) => { const { error } = await deleteTask(id); showToast(error?'Delete failed':'Task deleted') }
   const clearDone = async () => {
@@ -453,13 +559,10 @@ export default function Tasks() {
                 style={{ marginBottom:10, opacity:isDone?.55:1, cursor:'pointer', borderLeft:overdue?'3px solid var(--red)':todayDue?'3px solid var(--accent)':'none', paddingLeft:overdue||todayDue?13:16 }}
                 onClick={()=>setSelectedId(task.id)}
               >
-                <div style={{ display:'flex', alignItems:'flex-start', gap:10, marginBottom: isDone?0:8 }}>
-                  <button
-                    onClick={e=>handleToggleDone(e,task)}
-                    style={{ width:24, height:24, borderRadius:'50%', border:`2px solid ${isDone?'var(--green)':overdue?'var(--red)':'var(--border-strong)'}`, background:isDone?'var(--green)':'transparent', display:'flex', alignItems:'center', justifyContent:'center', cursor:'pointer', flexShrink:0, marginTop:1 }}
-                  >
-                    {isDone&&<i className="ti ti-check" style={{ fontSize:12, color:'#fff' }} />}
-                  </button>
+                <div style={{ display:'flex', alignItems:'flex-start', gap:10, marginBottom: isDone?0:10 }}>
+                  <div onClick={e=>e.stopPropagation()}>
+                    <CircularProgress progress={task.progress||0} done={isDone} color={overdue?'var(--red)':'var(--accent)'} onClick={e=>handleToggleDone(e,task)} />
+                  </div>
                   <div style={{ flex:1, minWidth:0 }}>
                     <div style={{ fontSize:14, fontWeight:500, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap', textDecoration:isDone?'line-through':'none', color:isDone?'var(--muted)':'var(--text)' }}>{task.title}</div>
                     {due && <div style={{ fontSize:11, color:due.red?'var(--red)':'var(--muted)', marginTop:2, fontWeight:due.red?600:400 }}>{due.text}</div>}
@@ -473,11 +576,8 @@ export default function Tasks() {
                   )}
                 </div>
                 {!isDone && (
-                  <div onClick={e=>e.stopPropagation()} style={{ paddingLeft:34 }}>
-                    <input type="range" min="0" max="100" step="5" value={task.progress} onChange={e=>handleProgress(e,task)} style={{ width:'100%', accentColor:overdue?'var(--red)':'var(--accent)', cursor:'pointer' }} />
-                    <div style={{ fontSize:10, color:overdue?'var(--red)':'var(--accent)', fontWeight:600, marginTop:1 }}>
-                      {task.progress}%{task.status==='in_progress'&&<span style={{ color:'var(--muted)', fontWeight:400 }}> · in progress</span>}
-                    </div>
+                  <div onClick={e=>e.stopPropagation()} style={{ paddingLeft:50 }}>
+                    <SlideToComplete accentColor={overdue?'var(--red)':'var(--accent)'} onComplete={()=>updateTask(task.id,{ status:'done', progress:100 })} />
                   </div>
                 )}
               </div>
