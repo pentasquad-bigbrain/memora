@@ -492,31 +492,6 @@ input[type="date"] {
   color-scheme: light;
 }
 
-/* ── Dark mode ──────────────────────────────────────────── */
-@media (prefers-color-scheme: dark) {
-  :root {
-    --bg: #1C1C1A;
-    --surface: #252523;
-    --border: #333330;
-    --border-strong: #4A4A46;
-    --text: #F0F0EE;
-    --muted: #8A8A84;
-    --hint: #5A5A55;
-    --accent-soft: #1E3A5F;
-    --accent-mid: #1E3A5F;
-    --accent-dark: #93C5FD;
-    --green-soft: #14290A;
-    --green-dark: #86EFAC;
-    --amber-soft: #291F0A;
-    --amber-dark: #FCD34D;
-    --red-soft: #2A0E0E;
-    --red-dark: #FCA5A5;
-    --purple-soft: #1E1040;
-    --purple-dark: #C4B5FD;
-  }
-  body { background: #111110; }
-}
-
 /* ── Responsive: full-width on narrow phones ────────────── */
 @media (max-width: 430px) {
   .page { max-width: 100%; box-shadow: none; }
