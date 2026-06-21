@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { useStore } from '../lib/store'
 import { expandIdea, generateJournalSummary, brainstormIdeas, analyzeImage } from '../lib/groq'
-import { formatDistanceToNow, format } from 'date-fns'
+import { formatDistanceToNow, format, isToday, isYesterday } from 'date-fns'
 import Tesseract from 'tesseract.js'
 import { SkeletonVaultCard } from '../components/shared/Skeleton'
 
@@ -465,9 +465,12 @@ export function Vault() {
 
   return (
     <div className="page">
-      <div style={{ padding: '14px 16px 0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <h2>Vault</h2>
-        <div style={{ display: 'flex', gap: 14 }}>
+      <div style={{ padding: '14px 16px 0', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+        <div>
+          <h2>Vault</h2>
+          <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 1 }}>All your captures, organised</div>
+        </div>
+        <div style={{ display: 'flex', gap: 14, paddingTop: 3 }}>
           <i className="ti ti-search" style={{ fontSize: 20, color: showSearch ? 'var(--accent)' : 'var(--muted)', cursor: 'pointer' }} onClick={() => setShowSearch(s => !s)} />
           <i className="ti ti-plus" style={{ fontSize: 20, color: 'var(--accent)', cursor: 'pointer' }} onClick={() => setShowAdd(true)} />
         </div>
@@ -519,6 +522,12 @@ export function Vault() {
       </div>
 
       <div className="page-scroll" style={{ paddingTop: 4 }}>
+        {!loading && filtered.length > 0 && (
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+            <div className="section-label" style={{ margin: 0 }}>{reviewMode ? 'Needs review' : 'Recent'}</div>
+            {!reviewMode && !search && <span onClick={() => setCat('all')} style={{ fontSize: 12, color: 'var(--accent)', fontWeight: 500, cursor: 'pointer' }}>See all</span>}
+          </div>
+        )}
         {loading ? (
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
             {Array.from({ length: 6 }).map((_, i) => <SkeletonVaultCard key={i} />)}
@@ -531,6 +540,31 @@ export function Vault() {
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
             {filtered.map(item => {
               const meta = VAULT_META[item.type] || VAULT_META.note
+              const isVoice = item.tags?.includes('voice')
+              const time = item.created_at ? format(new Date(item.created_at), 'h:mm a') : ''
+              const day = item.created_at ? (isToday(new Date(item.created_at)) ? 'Today' : isYesterday(new Date(item.created_at)) ? 'Yesterday' : format(new Date(item.created_at), 'd MMM')) : ''
+
+              if (!item.file_url) {
+                // Text-style item (note, receipt without photo, etc) — full colour card
+                return (
+                  <div
+                    key={item.id}
+                    onClick={() => setSelected(item)}
+                    style={{ background: meta.bg, borderRadius: 'var(--r)', overflow: 'hidden', cursor: 'pointer', padding: '12px 12px 10px', display: 'flex', flexDirection: 'column', minHeight: 132 }}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+                      <div style={{ width: 26, height: 26, borderRadius: 8, background: 'rgba(0,0,0,0.08)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                        <i className={`ti ${meta.icon}`} style={{ fontSize: 14, color: meta.color }} />
+                      </div>
+                      {isVoice && <i className="ti ti-microphone" style={{ fontSize: 14, color: meta.color }} />}
+                    </div>
+                    <div style={{ fontSize: 12, fontWeight: 600, color: meta.color, marginBottom: 4, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.title || 'Untitled'}</div>
+                    {item.ocr_text && <div style={{ fontSize: 11, color: 'var(--text)', lineHeight: 1.4, flex: 1, overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 3, WebkitBoxOrient: 'vertical' }}>{item.ocr_text}</div>}
+                    <div style={{ fontSize: 10, color: meta.color, opacity: .8, marginTop: 8 }}>{time}{day && ` ${day}`}</div>
+                  </div>
+                )
+              }
+
               return (
                 <div
                   key={item.id}
@@ -538,26 +572,33 @@ export function Vault() {
                   style={{ background: 'var(--bg)', borderRadius: 'var(--r)', overflow: 'hidden', cursor: 'pointer', border: '1px solid var(--border)' }}
                 >
                   <div style={{ height: 90, background: meta.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden', position: 'relative' }}>
-                    {item.file_url
-                      ? <img src={item.file_url} alt={item.title} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                      : <i className={`ti ${meta.icon}`} style={{ fontSize: 30, color: meta.color }} />
-                    }
-                    {item.tags?.includes('voice') && (
+                    <img src={item.file_url} alt={item.title} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                    {isVoice && (
                       <div style={{ position: 'absolute', top: 6, right: 6, background: 'rgba(0,0,0,0.5)', borderRadius: 20, padding: '2px 7px', display: 'flex', alignItems: 'center', gap: 4 }}>
                         <i className="ti ti-microphone" style={{ fontSize: 10, color: '#fff' }} />
                       </div>
                     )}
-                    <div style={{ position: 'absolute', bottom: 6, left: 6, background: meta.bg, color: meta.color, fontSize: 9, fontWeight: 600, padding: '2px 7px', borderRadius: 20, textTransform: 'uppercase', letterSpacing: .4 }}>
+                    <div style={{ position: 'absolute', bottom: 6, left: 6, background: 'rgba(0,0,0,0.55)', color: '#fff', fontSize: 9, fontWeight: 600, padding: '2px 7px', borderRadius: 20, textTransform: 'uppercase', letterSpacing: .4 }}>
                       {item.type}
                     </div>
                   </div>
                   <div style={{ padding: '8px 10px' }}>
                     <div style={{ fontSize: 12, fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.title || 'Untitled'}</div>
                     {item.ocr_text && <div style={{ fontSize: 10, color: 'var(--muted)', marginTop: 3, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.ocr_text}</div>}
+                    <div style={{ fontSize: 9, color: 'var(--hint)', marginTop: 4 }}>{time}{day && ` · ${day}`}</div>
                   </div>
                 </div>
               )
             })}
+            {!reviewMode && !search && (
+              <div onClick={() => setShowAdd(true)} style={{ border: '1.5px dashed var(--border-strong)', borderRadius: 'var(--r)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 8, padding: '16px 12px', cursor: 'pointer', minHeight: 132, textAlign: 'center' }}>
+                <div style={{ width: 32, height: 32, borderRadius: '50%', background: 'var(--accent-soft)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <i className="ti ti-plus" style={{ fontSize: 16, color: 'var(--accent)' }} />
+                </div>
+                <div style={{ fontSize: 12, fontWeight: 500, color: 'var(--text)' }}>Capture more</div>
+                <div style={{ fontSize: 10, color: 'var(--muted)' }}>Add images, notes, docs and more</div>
+              </div>
+            )}
           </div>
         )}
       </div>
