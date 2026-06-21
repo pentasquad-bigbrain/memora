@@ -72,14 +72,57 @@ function PersonModal({ person, tasks, onClose }) {
   )
 }
 
+function AddPersonModal({ onClose, onSave }) {
+  const ROLES = ['client', 'team', 'personal', 'vendor', 'other']
+  const [name,    setName]    = useState('')
+  const [role,    setRole]    = useState('other')
+  const [company, setCompany] = useState('')
+  const [saving,  setSaving]  = useState(false)
+  const handleSave = async () => {
+    if (!name.trim()) return
+    setSaving(true)
+    await onSave({ name: name.trim(), role, notes: company.trim() || null })
+    setSaving(false); onClose()
+  }
+  return (
+    <div style={{ position: 'fixed', inset: 0, zIndex: 300, display: 'flex', flexDirection: 'column', justifyContent: 'flex-end', background: 'rgba(0,0,0,0.45)' }} onClick={onClose}>
+      <div style={{ background: 'var(--surface)', borderRadius: '20px 20px 0 0', padding: '16px 20px calc(24px + env(safe-area-inset-bottom))', maxWidth: 430, margin: '0 auto', width: '100%' }} onClick={e => e.stopPropagation()}>
+        <div style={{ width: 36, height: 4, background: 'var(--border)', borderRadius: 2, margin: '0 auto 16px' }} />
+        <div style={{ fontSize: 16, fontWeight: 600, marginBottom: 14 }}>Add person</div>
+        <input className="input" placeholder="Name *" value={name} onChange={e => setName(e.target.value)} style={{ marginBottom: 10 }} autoFocus />
+        <input className="input" placeholder="Company / vendor (optional)" value={company} onChange={e => setCompany(e.target.value)} style={{ marginBottom: 12 }} />
+        <div style={{ fontSize: 12, fontWeight: 500, color: 'var(--muted)', marginBottom: 8 }}>Role</div>
+        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 16 }}>
+          {ROLES.map(r => (
+            <button key={r} onClick={() => setRole(r)} style={{ padding: '5px 14px', borderRadius: 20, fontSize: 12, fontWeight: 500, border: '1.5px solid', cursor: 'pointer', fontFamily: 'inherit', background: role === r ? 'var(--accent-soft)' : 'transparent', color: role === r ? 'var(--accent)' : 'var(--muted)', borderColor: role === r ? 'var(--accent)' : 'var(--border)', textTransform: 'capitalize' }}>{r}</button>
+          ))}
+        </div>
+        <div style={{ display: 'flex', gap: 8 }}>
+          <button className="btn btn-primary" style={{ flex: 1 }} onClick={handleSave} disabled={!name.trim() || saving}>
+            {saving ? 'Saving…' : 'Add person'}
+          </button>
+          <button className="btn btn-ghost" onClick={onClose}>Cancel</button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 export function People() {
-  const { people, tasks } = useStore()
-  const [search, setSearch] = useState('')
+  const { people, tasks, addPerson } = useStore()
+  const [search,   setSearch]   = useState('')
   const [selected, setSelected] = useState(null)
+  const [showAdd,  setShowAdd]  = useState(false)
+  const [toast, showToast] = useToast()
   const filtered = people.filter(p => p.name.toLowerCase().includes(search.toLowerCase()))
   return (
     <div className="page">
-      <div style={{ padding: '14px 16px 0' }}><h2>People</h2></div>
+      <div style={{ padding: '14px 16px 0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <h2>People</h2>
+        <button onClick={() => setShowAdd(true)} style={{ width: 36, height: 36, borderRadius: '50%', background: 'var(--accent-soft)', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <i className="ti ti-plus" style={{ fontSize: 18, color: 'var(--accent)' }} />
+        </button>
+      </div>
       <div style={{ padding: '0 16px' }}>
         <div className="search-bar">
           <i className="ti ti-search" />
@@ -88,7 +131,16 @@ export function People() {
       </div>
       <div className="page-scroll" style={{ paddingTop: 4 }}>
         {filtered.length === 0 ? (
-          <div style={{ textAlign: 'center', padding: '40px 0', color: 'var(--muted)', fontSize: 13 }}>{search ? 'No people found.' : 'People are auto-detected from your captures.'}</div>
+          <div style={{ textAlign: 'center', padding: '40px 0', color: 'var(--muted)', fontSize: 13 }}>
+            {search ? 'No people found.' : (
+              <div>
+                <div style={{ fontSize: 36, marginBottom: 10 }}>👥</div>
+                <div style={{ fontSize: 15, fontWeight: 500, color: 'var(--text)', marginBottom: 6 }}>No people yet</div>
+                <div style={{ fontSize: 13, marginBottom: 16 }}>People are auto-tagged from your captures, or you can add them manually.</div>
+                <button className="btn btn-ghost" onClick={() => setShowAdd(true)}><i className="ti ti-plus" style={{ fontSize: 14 }} /> Add person</button>
+              </div>
+            )}
+          </div>
         ) : (
           <div className="card" style={{ padding: '4px 16px' }}>
             {filtered.map((person, i) => {
@@ -99,7 +151,7 @@ export function People() {
                   <div className={`avatar avatar-lg ${avatarColor(person.name)}`}>{initials(person.name)}</div>
                   <div style={{ flex: 1 }}>
                     <div style={{ fontSize: 14, fontWeight: 500 }}>{person.name}</div>
-                    <span style={{ fontSize: 10, fontWeight: 500, background: rs.bg, color: rs.color, padding: '2px 8px', borderRadius: 20, display: 'inline-block', marginTop: 3 }}>{person.role || 'other'}</span>
+                    <span style={{ fontSize: 10, fontWeight: 500, background: rs.bg, color: rs.color, padding: '2px 8px', borderRadius: 20, display: 'inline-block', marginTop: 3, textTransform: 'capitalize' }}>{person.role || 'other'}</span>
                     <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 3 }}>{personTasks.length} tasks · {person.last_interaction ? `Last: ${formatDistanceToNow(new Date(person.last_interaction), { addSuffix: true })}` : 'No interaction yet'}</div>
                   </div>
                   <i className="ti ti-chevron-right" style={{ color: 'var(--muted)', fontSize: 16 }} />
@@ -114,6 +166,8 @@ export function People() {
         </div>
       </div>
       {selected && <PersonModal person={selected} tasks={tasks} onClose={() => setSelected(null)} />}
+      {showAdd && <AddPersonModal onClose={() => setShowAdd(false)} onSave={async (data) => { const { error } = await addPerson(data); if (!error) showToast('Person added'); else showToast('Failed to add') }} />}
+      {toast && <div className="toast">{toast}</div>}
     </div>
   )
 }
@@ -223,6 +277,29 @@ function VaultItemModal({ item, onClose, onDelete, onUpdate }) {
 const VAULT_PRESET_TAGS = ['work','personal','finance','health','family','learning','travel','reference','receipt','document']
 const isGenericTitle = (t) => !t || /^image\d*$/i.test(t) || /^img/i.test(t) || /^photo/i.test(t) || /^screenshot/i.test(t) || /\.[a-z]{3,4}$/.test(t)
 
+function VaultTagSection({ tags, onChange }) {
+  const [custom, setCustom] = useState('')
+  const toggle = (tag) => onChange(tags.includes(tag) ? tags.filter(t => t !== tag) : [...tags, tag])
+  const addCustom = () => { const t = custom.trim().toLowerCase(); if (t && !tags.includes(t)) onChange([...tags, t]); setCustom('') }
+  const all = [...new Set([...VAULT_PRESET_TAGS, ...tags.filter(t => !VAULT_PRESET_TAGS.includes(t))])]
+  return (
+    <div style={{ marginTop: 10 }}>
+      <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: .4, marginBottom: 8 }}>Tags</div>
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 8 }}>
+        {all.map(tag => (
+          <button key={tag} onClick={() => toggle(tag)} style={{ padding: '4px 12px', borderRadius: 20, fontSize: 12, fontWeight: 500, border: '1px solid', cursor: 'pointer', fontFamily: 'inherit', background: tags.includes(tag) ? 'var(--accent)' : 'transparent', color: tags.includes(tag) ? '#fff' : 'var(--muted)', borderColor: tags.includes(tag) ? 'var(--accent)' : 'var(--border)' }}>
+            {tag}
+          </button>
+        ))}
+      </div>
+      <div style={{ display: 'flex', gap: 6 }}>
+        <input className="input" placeholder="Add tag…" value={custom} onChange={e => setCustom(e.target.value)} onKeyDown={e => e.key === 'Enter' && addCustom()} style={{ fontSize: 12, padding: '6px 10px', flex: 1 }} />
+        <button onClick={addCustom} disabled={!custom.trim()} style={{ padding: '6px 12px', borderRadius: 'var(--r)', border: '1px solid var(--border)', background: 'var(--accent-soft)', color: 'var(--accent)', cursor: 'pointer', fontFamily: 'inherit', fontSize: 12, fontWeight: 600 }}>+ Add</button>
+      </div>
+    </div>
+  )
+}
+
 // Add to Vault modal with AI image analysis
 function AddVaultModal({ onClose, onSave }) {
   const [tab, setTab]         = useState('text')
@@ -327,14 +404,7 @@ function AddVaultModal({ onClose, onSave }) {
             <>
               <input className="input" placeholder="Title" value={title} onChange={e => setTitle(e.target.value)} style={{ marginBottom: 10 }} autoFocus />
               <textarea className="input" placeholder="Content (optional)" value={body} onChange={e => setBody(e.target.value)} style={{ minHeight: 100, marginBottom: 10 }} />
-              <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: .4, marginBottom: 8 }}>Tags</div>
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-                {VAULT_PRESET_TAGS.map(tag => (
-                  <button key={tag} onClick={() => toggleTag(tag)} style={{ padding: '4px 12px', borderRadius: 20, fontSize: 12, fontWeight: 500, border: '1px solid', cursor: 'pointer', fontFamily: 'inherit', background: selectedTags.includes(tag) ? 'var(--accent)' : 'transparent', color: selectedTags.includes(tag) ? '#fff' : 'var(--muted)', borderColor: selectedTags.includes(tag) ? 'var(--accent)' : 'var(--border)' }}>
-                    {tag}
-                  </button>
-                ))}
-              </div>
+              <VaultTagSection tags={selectedTags} onChange={setSelectedTags} />
             </>
           )}
 
@@ -377,14 +447,7 @@ function AddVaultModal({ onClose, onSave }) {
 
               <input className="input" placeholder="Title" value={imgTitle} onChange={e => setImgTitle(e.target.value)} style={{ marginBottom: 10 }} />
               <textarea className="input" placeholder={needsContext ? 'Describe what this image is about (required)…' : 'Description (auto-filled by AI)'} value={imgDesc} onChange={e => setImgDesc(e.target.value)} style={{ minHeight: 70, marginBottom: 10, borderColor: needsContext && !imgDesc.trim() ? 'var(--amber)' : undefined }} />
-              <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: .4, marginBottom: 8 }}>Tags</div>
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-                {VAULT_PRESET_TAGS.map(tag => (
-                  <button key={tag} onClick={() => toggleTag(tag)} style={{ padding: '4px 12px', borderRadius: 20, fontSize: 12, fontWeight: 500, border: '1px solid', cursor: 'pointer', fontFamily: 'inherit', background: selectedTags.includes(tag) ? 'var(--accent)' : 'transparent', color: selectedTags.includes(tag) ? '#fff' : 'var(--muted)', borderColor: selectedTags.includes(tag) ? 'var(--accent)' : 'var(--border)' }}>
-                    {tag}
-                  </button>
-                ))}
-              </div>
+              <VaultTagSection tags={selectedTags} onChange={setSelectedTags} />
             </>
           )}
 
@@ -500,14 +563,18 @@ function ReviewModal({ images, onUpdate, onClose }) {
 }
 
 export function Vault() {
-  const { vaultItems, addVaultItem, deleteVaultItem, updateVaultItem, loading } = useStore()
-  const [cat, setCat]       = useState('all')
-  const [search, setSearch] = useState('')
+  const { vaultItems, addVaultItem, deleteVaultItem, updateVaultItem, loading, expenses, ideas, addIdea } = useStore()
+  const [cat, setCat]           = useState('all')
+  const [search, setSearch]     = useState('')
   const [showSearch, setShowSearch] = useState(false)
   const [showAdd, setShowAdd]   = useState(false)
   const [showReview, setShowReview] = useState(false)
-  const [uploading, setUploading] = useState(false)
-  const [selected, setSelected] = useState(null)
+  const [uploading, setUploading]   = useState(false)
+  const [selected, setSelected]     = useState(null)
+  const [multiSelect, setMultiSelect]   = useState(false)
+  const [selectedIds, setSelectedIds]   = useState(new Set())
+  const [cardMenu, setCardMenu]         = useState(null)
+  const longPressTimer = useRef(null)
   const [toast, showToast] = useToast()
 
   const unclearedImages = vaultItems.filter(v => v.type === 'image' && (!v.ocr_text || v.ocr_text.trim().length < 25))
@@ -537,6 +604,39 @@ export function Vault() {
     if (!error) { showToast('Updated'); setSelected(null) }
     else showToast('Update failed')
   }
+
+  const handleDeleteSelected = async () => {
+    for (const id of selectedIds) await deleteVaultItem(id)
+    setSelectedIds(new Set()); setMultiSelect(false); showToast(`${selectedIds.size} items deleted`)
+  }
+
+  const handleAddSelectedToIdea = async () => {
+    const items = vaultItems.filter(v => selectedIds.has(v.id))
+    const body = items.map(v => `• ${v.title}: ${v.ocr_text || ''}`).join('\n').slice(0, 600)
+    await addIdea({ title: `Idea from ${items.length} vault item${items.length !== 1 ? 's' : ''}`, body, tags: [], status: 'raw', source: 'vault' })
+    setSelectedIds(new Set()); setMultiSelect(false); showToast('Added to IdeaLab')
+  }
+
+  const startLongPress = (item) => {
+    longPressTimer.current = setTimeout(() => {
+      setMultiSelect(true)
+      setSelectedIds(new Set([item.id]))
+    }, 600)
+  }
+  const cancelLongPress = () => clearTimeout(longPressTimer.current)
+
+  const toggleSelect = (id) => {
+    setSelectedIds(prev => {
+      const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n
+    })
+  }
+
+  // Receipts dashboard data
+  const now = new Date()
+  const monthReceipts = (expenses || []).filter(e => { const d = new Date(e.date); return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear() })
+  const monthTotal = monthReceipts.reduce((s, e) => s + Number(e.amount), 0)
+  const vendorTotals = monthReceipts.reduce((acc, e) => { acc[e.vendor] = (acc[e.vendor] || 0) + Number(e.amount); return acc }, {})
+  const topVendors = Object.entries(vendorTotals).sort((a, b) => b[1] - a[1]).slice(0, 5)
 
   return (
     <div className="page">
@@ -569,7 +669,67 @@ export function Vault() {
         </div>
       </div>
 
+      {/* Multi-select action bar */}
+      {multiSelect && (
+        <div style={{ padding: '8px 16px', background: 'var(--accent-soft)', borderBottom: '1px solid var(--accent-mid)', display: 'flex', alignItems: 'center', gap: 10 }}>
+          <button onClick={() => { setMultiSelect(false); setSelectedIds(new Set()) }} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--accent)', fontSize: 13, fontFamily: 'inherit', fontWeight: 500 }}>
+            <i className="ti ti-x" style={{ fontSize: 14 }} /> Cancel
+          </button>
+          <span style={{ fontSize: 13, color: 'var(--accent)', fontWeight: 600, flex: 1 }}>{selectedIds.size} selected</span>
+          {selectedIds.size > 0 && (
+            <>
+              <button onClick={handleAddSelectedToIdea} style={{ background: 'var(--purple-soft)', border: 'none', color: 'var(--purple-dark)', fontSize: 12, fontWeight: 600, padding: '6px 12px', borderRadius: 20, cursor: 'pointer', fontFamily: 'inherit' }}>+ IdeaLab</button>
+              <button onClick={handleDeleteSelected} style={{ background: 'var(--red-soft)', border: 'none', color: 'var(--red)', fontSize: 12, fontWeight: 600, padding: '6px 12px', borderRadius: 20, cursor: 'pointer', fontFamily: 'inherit' }}>Delete</button>
+            </>
+          )}
+        </div>
+      )}
+
       <div className="page-scroll" style={{ paddingTop: 4 }}>
+        {/* Receipts accounting dashboard */}
+        {cat === 'receipt' && (
+          <div style={{ marginBottom: 16 }}>
+            <div style={{ background: 'linear-gradient(135deg, var(--amber-soft), #FEF3C7)', borderRadius: 'var(--r)', padding: '16px', marginBottom: 10, border: '1px solid var(--amber)' }}>
+              <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--amber-dark)', textTransform: 'uppercase', letterSpacing: .4, marginBottom: 4 }}>This month</div>
+              <div style={{ fontSize: 28, fontWeight: 700, color: 'var(--text)' }}>₹{Math.round(monthTotal).toLocaleString('en-IN')}</div>
+              <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 2 }}>{monthReceipts.length} expense{monthReceipts.length !== 1 ? 's' : ''} · {format(now, 'MMMM yyyy')}</div>
+            </div>
+            {topVendors.length > 0 && (
+              <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--r)', padding: '12px 14px' }}>
+                <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: .4, marginBottom: 10 }}>Top vendors</div>
+                {topVendors.map(([vendor, amt]) => (
+                  <div key={vendor} style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8 }}>
+                    <div style={{ flex: 1 }}>
+                      <div style={{ fontSize: 13, fontWeight: 500, marginBottom: 3 }}>{vendor}</div>
+                      <div style={{ height: 4, borderRadius: 2, background: 'var(--border)', overflow: 'hidden' }}>
+                        <div style={{ height: '100%', background: 'var(--amber)', borderRadius: 2, width: `${monthTotal > 0 ? (amt / monthTotal) * 100 : 0}%` }} />
+                      </div>
+                    </div>
+                    <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--amber-dark)', flexShrink: 0 }}>₹{Math.round(amt).toLocaleString('en-IN')}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+            {monthReceipts.length > 0 && (
+              <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--r)', padding: '4px 14px', marginTop: 10 }}>
+                {monthReceipts.slice(0, 10).map((e, i) => (
+                  <div key={e.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 0', borderBottom: i < Math.min(monthReceipts.length, 10) - 1 ? '1px solid var(--border)' : 'none' }}>
+                    <i className="ti ti-receipt" style={{ fontSize: 15, color: 'var(--amber)', flexShrink: 0 }} />
+                    <div style={{ flex: 1 }}>
+                      <div style={{ fontSize: 13, fontWeight: 500 }}>{e.vendor || 'Unknown'}</div>
+                      <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 2 }}>{e.date}</div>
+                    </div>
+                    <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text)' }}>₹{Math.round(e.amount).toLocaleString('en-IN')}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+            {monthReceipts.length === 0 && expenses?.length === 0 && (
+              <div style={{ textAlign: 'center', padding: '20px 0', color: 'var(--muted)', fontSize: 13 }}>No expenses logged yet. Use Capture to add receipts.</div>
+            )}
+          </div>
+        )}
+
         {/* Review banner */}
         {unclearedImages.length > 0 && (
           <button onClick={() => setShowReview(true)} style={{ display: 'flex', alignItems: 'center', gap: 14, width: '100%', marginBottom: 14, padding: '14px 16px', background: 'linear-gradient(135deg, var(--accent-soft), var(--purple-soft))', border: '1.5px solid var(--accent-mid)', borderRadius: 'var(--r)', cursor: 'pointer', fontFamily: 'inherit', textAlign: 'left' }}>
@@ -610,53 +770,81 @@ export function Vault() {
               const time = item.created_at ? format(new Date(item.created_at), 'h:mm a') : ''
               const day = item.created_at ? (isToday(new Date(item.created_at)) ? 'Today' : isYesterday(new Date(item.created_at)) ? 'Yesterday' : format(new Date(item.created_at), 'd MMM')) : ''
 
+              const isSelected = selectedIds.has(item.id)
+              const cardProps = {
+                onPointerDown: () => startLongPress(item),
+                onPointerUp: cancelLongPress,
+                onPointerCancel: cancelLongPress,
+                onClick: () => {
+                  if (multiSelect) { toggleSelect(item.id) }
+                  else if (cardMenu === item.id) { setCardMenu(null) }
+                  else { setSelected(item) }
+                }
+              }
+
               if (!item.file_url) {
-                // Text-style item (note, receipt without photo, etc) — full colour card
                 return (
-                  <div
-                    key={item.id}
-                    onClick={() => setSelected(item)}
-                    style={{ background: meta.bg, borderRadius: 'var(--r)', overflow: 'hidden', cursor: 'pointer', padding: '12px 12px 10px', display: 'flex', flexDirection: 'column', minHeight: 132 }}
-                  >
+                  <div key={item.id} {...cardProps} style={{ background: isSelected ? meta.color + '28' : meta.bg, borderRadius: 'var(--r)', overflow: 'hidden', cursor: 'pointer', padding: '12px 12px 10px', display: 'flex', flexDirection: 'column', minHeight: 132, border: isSelected ? `2px solid ${meta.color}` : '2px solid transparent', position: 'relative' }}>
                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
                       <div style={{ width: 26, height: 26, borderRadius: 8, background: 'rgba(0,0,0,0.08)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                        <i className={`ti ${meta.icon}`} style={{ fontSize: 14, color: meta.color }} />
+                        {isSelected ? <i className="ti ti-circle-check" style={{ fontSize: 14, color: meta.color }} /> : <i className={`ti ${meta.icon}`} style={{ fontSize: 14, color: meta.color }} />}
                       </div>
-                      {isVoice && <i className="ti ti-microphone" style={{ fontSize: 14, color: meta.color }} />}
+                      <button onClick={e => { e.stopPropagation(); setCardMenu(cardMenu === item.id ? null : item.id) }} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 2, color: meta.color }}>
+                        <i className="ti ti-dots" style={{ fontSize: 14 }} />
+                      </button>
                     </div>
                     <div style={{ fontSize: 12, fontWeight: 600, color: meta.color, marginBottom: 4, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.title || 'Untitled'}</div>
                     {item.ocr_text && <div style={{ fontSize: 11, color: 'var(--text)', lineHeight: 1.4, flex: 1, overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 3, WebkitBoxOrient: 'vertical' }}>{item.ocr_text}</div>}
                     <div style={{ fontSize: 10, color: meta.color, opacity: .8, marginTop: 8 }}>{time}{day && ` ${day}`}</div>
+                    {cardMenu === item.id && (
+                      <div onClick={e => e.stopPropagation()} style={{ position: 'absolute', top: 36, right: 8, background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--r-sm)', boxShadow: '0 4px 16px rgba(0,0,0,0.15)', zIndex: 10, minWidth: 140, overflow: 'hidden' }}>
+                        {[
+                          { label: 'Delete', icon: 'ti-trash', color: 'var(--red)', action: () => { handleDelete(item.id); setCardMenu(null) } },
+                          { label: 'Add to IdeaLab', icon: 'ti-bulb', color: 'var(--purple)', action: async () => { await addIdea({ title: item.title || 'Vault item', body: item.ocr_text || null, tags: item.tags || [], status: 'raw', source: 'vault' }); showToast('Added to IdeaLab'); setCardMenu(null) } },
+                        ].map(opt => (
+                          <button key={opt.label} onClick={opt.action} style={{ display: 'flex', alignItems: 'center', gap: 8, width: '100%', padding: '10px 14px', background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'inherit', textAlign: 'left', fontSize: 13, color: opt.color || 'var(--text)' }}>
+                            <i className={`ti ${opt.icon}`} style={{ fontSize: 14 }} /> {opt.label}
+                          </button>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 )
               }
 
               return (
-                <div
-                  key={item.id}
-                  onClick={() => setSelected(item)}
-                  style={{ background: 'var(--bg)', borderRadius: 'var(--r)', overflow: 'hidden', cursor: 'pointer', border: '1px solid var(--border)' }}
-                >
+                <div key={item.id} {...cardProps} style={{ background: 'var(--bg)', borderRadius: 'var(--r)', overflow: 'hidden', cursor: 'pointer', border: isSelected ? `2px solid var(--accent)` : '1px solid var(--border)', position: 'relative' }}>
                   <div style={{ height: 90, background: meta.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden', position: 'relative' }}>
                     <img src={item.file_url} alt={item.title} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                    {isVoice && (
-                      <div style={{ position: 'absolute', top: 6, right: 6, background: 'rgba(0,0,0,0.5)', borderRadius: 20, padding: '2px 7px', display: 'flex', alignItems: 'center', gap: 4 }}>
-                        <i className="ti ti-microphone" style={{ fontSize: 10, color: '#fff' }} />
-                      </div>
-                    )}
-                    <div style={{ position: 'absolute', bottom: 6, left: 6, background: 'rgba(0,0,0,0.55)', color: '#fff', fontSize: 9, fontWeight: 600, padding: '2px 7px', borderRadius: 20, textTransform: 'uppercase', letterSpacing: .4 }}>
-                      {item.type}
-                    </div>
+                    {isSelected && <div style={{ position: 'absolute', inset: 0, background: 'rgba(59,130,246,0.3)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><i className="ti ti-circle-check" style={{ fontSize: 28, color: '#fff' }} /></div>}
+                    {isVoice && <div style={{ position: 'absolute', top: 6, right: 6, background: 'rgba(0,0,0,0.5)', borderRadius: 20, padding: '2px 7px', display: 'flex', alignItems: 'center', gap: 4 }}><i className="ti ti-microphone" style={{ fontSize: 10, color: '#fff' }} /></div>}
+                    <div style={{ position: 'absolute', bottom: 6, left: 6, background: 'rgba(0,0,0,0.55)', color: '#fff', fontSize: 9, fontWeight: 600, padding: '2px 7px', borderRadius: 20, textTransform: 'uppercase', letterSpacing: .4 }}>{item.type}</div>
+                    <button onClick={e => { e.stopPropagation(); setCardMenu(cardMenu === item.id ? null : item.id) }} style={{ position: 'absolute', top: 4, right: 4, width: 26, height: 26, borderRadius: '50%', background: 'rgba(0,0,0,0.55)', border: 'none', cursor: 'pointer', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                      <i className="ti ti-dots" style={{ fontSize: 13 }} />
+                    </button>
                   </div>
                   <div style={{ padding: '8px 10px' }}>
                     <div style={{ fontSize: 12, fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.title || 'Untitled'}</div>
                     {item.ocr_text && <div style={{ fontSize: 10, color: 'var(--muted)', marginTop: 3, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.ocr_text}</div>}
                     <div style={{ fontSize: 9, color: 'var(--hint)', marginTop: 4 }}>{time}{day && ` · ${day}`}</div>
                   </div>
+                  {cardMenu === item.id && (
+                    <div onClick={e => e.stopPropagation()} style={{ position: 'absolute', top: 90, right: 0, background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--r-sm)', boxShadow: '0 4px 16px rgba(0,0,0,0.15)', zIndex: 10, minWidth: 150, overflow: 'hidden' }}>
+                      {[
+                        { label: 'Delete', icon: 'ti-trash', color: 'var(--red)', action: () => { handleDelete(item.id); setCardMenu(null) } },
+                        { label: 'Add to IdeaLab', icon: 'ti-bulb', color: 'var(--purple)', action: async () => { await addIdea({ title: item.title || 'Vault item', body: item.ocr_text || null, tags: item.tags || [], status: 'raw', source: 'vault' }); showToast('Added to IdeaLab'); setCardMenu(null) } },
+                        { label: 'Select', icon: 'ti-checkbox', color: 'var(--accent)', action: () => { setMultiSelect(true); setSelectedIds(new Set([item.id])); setCardMenu(null) } },
+                      ].map(opt => (
+                        <button key={opt.label} onClick={opt.action} style={{ display: 'flex', alignItems: 'center', gap: 8, width: '100%', padding: '10px 14px', background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'inherit', textAlign: 'left', fontSize: 13, color: opt.color || 'var(--text)' }}>
+                          <i className={`ti ${opt.icon}`} style={{ fontSize: 14 }} /> {opt.label}
+                        </button>
+                      ))}
+                    </div>
+                  )}
                 </div>
               )
             })}
-            {!reviewMode && !search && (
+            {!search && (
               <div onClick={() => setShowAdd(true)} style={{ border: '1.5px dashed var(--border-strong)', borderRadius: 'var(--r)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 8, padding: '16px 12px', cursor: 'pointer', minHeight: 132, textAlign: 'center' }}>
                 <div style={{ width: 32, height: 32, borderRadius: '50%', background: 'var(--accent-soft)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                   <i className="ti ti-plus" style={{ fontSize: 16, color: 'var(--accent)' }} />
@@ -705,36 +893,41 @@ export function Journal() {
   const imgInputRef   = useRef(null)
   const newEntryRef   = useRef(null)
 
-  const today = new Date()
-  const weekDays = Array.from({ length: 7 }, (_, i) => { const d = new Date(today); d.setDate(today.getDate() - 3 + i); return d })
+  const todayDate = new Date()
+  const [centerDate, setCenterDate] = useState(() => new Date())
   const [selectedDay, setSelectedDay] = useState(3)
+  const [savedMode, setSavedMode] = useState(false)
+  const datePickerRef = useRef(null)
+
+  const weekDays = Array.from({ length: 7 }, (_, i) => { const d = new Date(centerDate); d.setDate(centerDate.getDate() - 3 + i); return d })
   const selectedDate = weekDays[selectedDay]
   const dateStr = `${selectedDate.getFullYear()}-${String(selectedDate.getMonth()+1).padStart(2,'0')}-${String(selectedDate.getDate()).padStart(2,'0')}`
+  const isFutureDate = selectedDate > todayDate && selectedDate.toDateString() !== todayDate.toDateString()
 
   useEffect(() => {
     setLogEntries([]); setNewEntryText(''); setEditingId(null)
-    setAiSummary(null); setJournalImages([]); setPromotedTasks({})
+    setAiSummary(null); setJournalImages([]); setPromotedTasks({}); setSavedMode(false)
     fetchJournalEntry(dateStr).then(entry => {
       if (!entry) return
       const summary = entry.auto_summary || null
       if (summary) {
         const { journal_images, log_entries, ...rest } = summary
-        // Legacy entries stored images as plain base64 strings; normalise to objects.
         const normImages = (journal_images || []).map(img =>
           typeof img === 'string'
             ? { id: `${Date.now()}-${Math.random().toString(36).slice(2,7)}`, url: img, description: '', location: null, timestamp: entry.date || new Date().toISOString() }
             : img
         )
         setJournalImages(normImages)
-        // Restore log entries; fall back to personal_note as first entry
         if (log_entries?.length) {
           setLogEntries(log_entries)
         } else if (entry.personal_note) {
           setLogEntries([makeEntry(entry.personal_note)])
         }
         setAiSummary(Object.keys(rest).length ? rest : null)
+        setSavedMode(true)
       } else if (entry.personal_note) {
         setLogEntries([makeEntry(entry.personal_note)])
+        setSavedMode(true)
       }
     })
   }, [dateStr])
@@ -875,7 +1068,7 @@ export function Journal() {
     }
     const { error } = await saveJournalEntry({ date: dateStr, personalNote: null, autoSummary: summary, journalImages, logEntries })
     setSaving(false)
-    if (!error) showToast('Journal saved')
+    if (!error) { showToast('Journal saved'); setSavedMode(true) }
     else showToast('Save failed')
   }
 
@@ -887,21 +1080,49 @@ export function Journal() {
     <div className="page">
       <div style={{ padding: '14px 16px 0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <h2>Journal</h2>
-        <button onClick={() => { setShowSearch(s => !s); setSearchQuery('') }} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 4, color: showSearch ? 'var(--accent)' : 'var(--muted)' }}>
-          <i className="ti ti-search" style={{ fontSize: 20 }} />
-        </button>
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+          {savedMode && (
+            <button onClick={() => setSavedMode(false)} style={{ fontSize: 12, fontWeight: 600, color: 'var(--accent)', background: 'var(--accent-soft)', border: '1px solid var(--accent-mid)', borderRadius: 20, padding: '4px 12px', cursor: 'pointer', fontFamily: 'inherit' }}>
+              <i className="ti ti-edit" style={{ fontSize: 12 }} /> Edit Journal
+            </button>
+          )}
+          <button onClick={() => { setShowSearch(s => !s); setSearchQuery('') }} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 4, color: showSearch ? 'var(--accent)' : 'var(--muted)' }}>
+            <i className="ti ti-search" style={{ fontSize: 20 }} />
+          </button>
+        </div>
       </div>
 
-      {/* Week strip */}
-      <div style={{ display: 'flex', gap: 4, padding: '10px 16px 0', overflowX: 'auto', scrollbarWidth: 'none' }}>
-        {weekDays.map((d, i) => (
-          <div key={i} onClick={() => { setSelectedDay(i); setSearchQuery(''); setShowSearch(false) }} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4, cursor: 'pointer', minWidth: 36 }}>
-            <div style={{ fontSize: 10, color: 'var(--muted)' }}>{d.toLocaleDateString('en', { weekday: 'short' })}</div>
-            <div style={{ width: 30, height: 30, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, fontWeight: 500, background: i === selectedDay ? 'var(--accent)' : 'transparent', color: i === selectedDay ? '#fff' : 'var(--muted)' }}>
-              {d.getDate()}
-            </div>
-          </div>
-        ))}
+      {/* Week strip with navigation */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '10px 12px 0' }}>
+        <button onClick={() => { const d = new Date(centerDate); d.setDate(d.getDate() - 7); setCenterDate(d); setSelectedDay(3) }} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 4, color: 'var(--muted)', flexShrink: 0 }}>
+          <i className="ti ti-chevron-left" style={{ fontSize: 18 }} />
+        </button>
+        <div style={{ flex: 1, display: 'flex', gap: 4, overflowX: 'auto', scrollbarWidth: 'none' }}>
+          {weekDays.map((d, i) => {
+            const isToday_ = d.toDateString() === todayDate.toDateString()
+            return (
+              <div key={i} onClick={() => { setSelectedDay(i); setSearchQuery(''); setShowSearch(false) }} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4, cursor: 'pointer', minWidth: 32 }}>
+                <div style={{ fontSize: 10, color: isToday_ ? 'var(--accent)' : 'var(--muted)', fontWeight: isToday_ ? 600 : 400 }}>{d.toLocaleDateString('en', { weekday: 'short' })}</div>
+                <div style={{ width: 30, height: 30, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, fontWeight: 500, background: i === selectedDay ? 'var(--accent)' : isToday_ ? 'var(--accent-soft)' : 'transparent', color: i === selectedDay ? '#fff' : isToday_ ? 'var(--accent)' : 'var(--muted)' }}>
+                  {d.getDate()}
+                </div>
+              </div>
+            )
+          })}
+        </div>
+        {weekDays[3].toDateString() !== todayDate.toDateString() && (
+          <button onClick={() => { const d = new Date(centerDate); d.setDate(d.getDate() + 7); setCenterDate(d); setSelectedDay(3) }} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 4, color: 'var(--muted)', flexShrink: 0 }}>
+            <i className="ti ti-chevron-right" style={{ fontSize: 18 }} />
+          </button>
+        )}
+        <button onClick={() => datePickerRef.current?.showPicker?.()} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 4, color: 'var(--muted)', flexShrink: 0 }} title="Jump to date">
+          <i className="ti ti-calendar" style={{ fontSize: 18 }} />
+        </button>
+        <input ref={datePickerRef} type="date" style={{ display: 'none' }} onChange={e => {
+          if (!e.target.value) return
+          const picked = new Date(e.target.value + 'T12:00:00')
+          setCenterDate(picked); setSelectedDay(3)
+        }} />
       </div>
 
       {showSearch && (
@@ -961,22 +1182,31 @@ export function Journal() {
                     </div>
                     <div style={{ fontSize: 13, lineHeight: 1.6, color: 'var(--text)', whiteSpace: 'pre-wrap' }}>{entry.text}</div>
                   </div>
-                  <div style={{ display: 'flex', gap: 4, flexShrink: 0 }}>
-                    <button onClick={() => { setEditingId(entry.id); setEditingText(entry.text) }} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 4, color: 'var(--hint)' }}>
-                      <i className="ti ti-edit" style={{ fontSize: 13 }} />
-                    </button>
-                    <button onClick={() => deleteEntry(entry.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 4, color: 'var(--hint)' }}>
-                      <i className="ti ti-trash" style={{ fontSize: 13 }} />
-                    </button>
-                  </div>
+                  {!savedMode && (
+                    <div style={{ display: 'flex', gap: 4, flexShrink: 0 }}>
+                      <button onClick={() => { setEditingId(entry.id); setEditingText(entry.text) }} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 4, color: 'var(--hint)' }}>
+                        <i className="ti ti-edit" style={{ fontSize: 13 }} />
+                      </button>
+                      <button onClick={() => deleteEntry(entry.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 4, color: 'var(--hint)' }}>
+                        <i className="ti ti-trash" style={{ fontSize: 13 }} />
+                      </button>
+                    </div>
+                  )}
                 </div>
               </div>
             )}
           </div>
         ))}
 
+        {savedMode && logEntries.length > 0 && (
+          <div style={{ padding: '8px 12px', background: 'var(--accent-soft)', border: '1px solid var(--accent-mid)', borderRadius: 'var(--r)', marginBottom: 10, fontSize: 12, color: 'var(--accent-dark)', display: 'flex', alignItems: 'center', gap: 6 }}>
+            <i className="ti ti-lock" style={{ fontSize: 13 }} />
+            Journal saved — tap <strong>Edit Journal</strong> to make changes
+          </div>
+        )}
+
         {/* Add new entry input */}
-        <div style={{ background: 'var(--bg)', border: '1.5px solid var(--border)', borderRadius: 'var(--r)', padding: '10px 12px', marginBottom: 8 }}>
+        {!savedMode && <div style={{ background: 'var(--bg)', border: '1.5px solid var(--border)', borderRadius: 'var(--r)', padding: '10px 12px', marginBottom: 8 }}>
           <textarea
             ref={newEntryRef}
             className="input"
@@ -1011,7 +1241,7 @@ export function Journal() {
               <i className="ti ti-plus" style={{ fontSize: 13 }} /> Add entry
             </button>
           </div>
-        </div>
+        </div>}
 
         {/* Image gallery — journal-only, never in vault */}
         {journalImages.length > 0 && (
@@ -1198,7 +1428,7 @@ function NewIdeaModal({ tasks, vaultItems, onClose, onSave }) {
         </div>
 
         <div className="tabs" style={{ padding: '0 20px' }}>
-          {[['text','ti-pencil','Text'], ['photo','ti-camera','Photo'], ['tasks','ti-checkbox','Tasks'], ['notes','ti-notes','Notes']].map(([t, icon, label]) => (
+          {[['text','ti-pencil','Text'], ['photo','ti-camera','Photo'], ['tasks','ti-checkbox','Tasks'], ['notes','ti-photo','Vault']].map(([t, icon, label]) => (
             <button key={t} className={`tab ${tab === t ? 'active' : ''}`} onClick={() => setTab(t)} style={{ flex: 1, fontSize: 11, padding: '10px 6px' }}>
               <i className={`ti ${icon}`} style={{ fontSize: 13, display: 'block', margin: '0 auto 2px' }} />{label}
             </button>
@@ -1251,19 +1481,26 @@ function NewIdeaModal({ tasks, vaultItems, onClose, onSave }) {
             </>
           )}
 
-          {/* FROM NOTES */}
+          {/* FROM VAULT */}
           {tab === 'notes' && (
             <>
-              <div style={{ fontSize: 13, color: 'var(--muted)', marginBottom: 10 }}>Select notes to inspire an idea</div>
+              <div style={{ fontSize: 13, color: 'var(--muted)', marginBottom: 10 }}>Select vault items to inspire an idea</div>
               <div style={{ maxHeight: 260, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 12 }}>
-                {vaultItems.filter(v => v.type === 'note').slice(0, 20).map(v => (
-                  <div key={v.id} onClick={() => setSelectedNotes(s => { const n = new Set(s); n.has(v.id) ? n.delete(v.id) : n.add(v.id); return n })} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px', borderRadius: 'var(--r-sm)', border: `1px solid ${selectedNotes.has(v.id) ? 'var(--accent)' : 'var(--border)'}`, background: selectedNotes.has(v.id) ? 'var(--accent-soft)' : 'var(--bg)', cursor: 'pointer' }}>
-                    <i className={`ti ${selectedNotes.has(v.id) ? 'ti-circle-check' : 'ti-circle'}`} style={{ color: selectedNotes.has(v.id) ? 'var(--accent)' : 'var(--hint)', fontSize: 16 }} />
-                    <span style={{ fontSize: 13, color: 'var(--text)', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{v.title || 'Untitled'}</span>
-                  </div>
-                ))}
+                {vaultItems.slice(0, 30).map(v => {
+                  const vm = VAULT_META[v.type] || VAULT_META.note
+                  return (
+                    <div key={v.id} onClick={() => setSelectedNotes(s => { const n = new Set(s); n.has(v.id) ? n.delete(v.id) : n.add(v.id); return n })} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px', borderRadius: 'var(--r-sm)', border: `1px solid ${selectedNotes.has(v.id) ? 'var(--accent)' : 'var(--border)'}`, background: selectedNotes.has(v.id) ? 'var(--accent-soft)' : 'var(--bg)', cursor: 'pointer' }}>
+                      <i className={`ti ${selectedNotes.has(v.id) ? 'ti-circle-check' : vm.icon}`} style={{ color: selectedNotes.has(v.id) ? 'var(--accent)' : vm.color, fontSize: 16, flexShrink: 0 }} />
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ fontSize: 13, color: 'var(--text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{v.title || 'Untitled'}</div>
+                        <div style={{ fontSize: 10, color: 'var(--muted)', marginTop: 1, textTransform: 'capitalize' }}>{v.type}</div>
+                      </div>
+                    </div>
+                  )
+                })}
+                {vaultItems.length === 0 && <div style={{ textAlign: 'center', padding: '20px 0', color: 'var(--muted)', fontSize: 13 }}>No vault items yet.</div>}
               </div>
-              {selectedNotes.size > 0 && <button className="btn btn-ghost" style={{ width: '100%', marginBottom: 10 }} onClick={buildFromNotes}><i className="ti ti-arrow-right" style={{ fontSize: 14 }} /> Build idea from {selectedNotes.size} notes</button>}
+              {selectedNotes.size > 0 && <button className="btn btn-ghost" style={{ width: '100%', marginBottom: 10 }} onClick={buildFromNotes}><i className="ti ti-arrow-right" style={{ fontSize: 14 }} /> Build idea from {selectedNotes.size} item{selectedNotes.size !== 1 ? 's' : ''}</button>}
             </>
           )}
 

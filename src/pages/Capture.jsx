@@ -15,9 +15,54 @@ const TYPE_META = {
 const ALL_TYPES = ['task','idea','expense','note','person']
 const CAPTURE_DEST = { task:'/tasks', idea:'/idealab', expense:'/vault', note:'/vault', person:'/people' }
 const PRESET_TAGS = ['work','personal','finance','health','family','learning','travel','urgent','idea','reference']
+const VAULT_PRESET = ['work','personal','finance','health','family','learning','travel','reference','receipt','document']
+
+export const PRIORITY_META = {
+  low:  { color:'var(--green)',  bg:'var(--green-soft)',  label:'Low' },
+  med:  { color:'var(--amber)',  bg:'var(--amber-soft)',  label:'Medium' },
+  high: { color:'var(--red)',    bg:'var(--red-soft)',    label:'High' },
+}
+
+function scheduleReminder(title, reminderAt) {
+  if (!reminderAt || !('Notification' in window)) return
+  const delay = new Date(reminderAt) - Date.now()
+  if (delay <= 0) return
+  const go = () => new Notification('⏰ Memora Reminder', { body: title, icon: '/memora/icon-192.png' })
+  if (Notification.permission === 'granted') { setTimeout(go, Math.min(delay, 2147483647)); return }
+  Notification.requestPermission().then(p => { if (p === 'granted') setTimeout(go, Math.min(delay, 2147483647)) })
+}
+
+// Reusable tag chips + manual input
+function TagSection({ tags, onChange, presets }) {
+  const [custom, setCustom] = useState('')
+  const toggle = (t) => onChange(tags.includes(t) ? tags.filter(x=>x!==t) : [...tags, t])
+  const addCustom = () => {
+    const t = custom.trim().toLowerCase()
+    if (t && !tags.includes(t)) onChange([...tags, t])
+    setCustom('')
+  }
+  const all = [...new Set([...presets, ...tags.filter(t=>!presets.includes(t))])]
+  return (
+    <div>
+      <div style={{ fontSize:11, fontWeight:600, color:'var(--muted)', textTransform:'uppercase', letterSpacing:.4, marginBottom:8 }}>Tags</div>
+      <div style={{ display:'flex', flexWrap:'wrap', gap:6, marginBottom:8 }}>
+        {all.map(tag=>(
+          <button key={tag} onClick={()=>toggle(tag)} style={{ padding:'4px 12px', borderRadius:20, fontSize:12, fontWeight:500, border:'1px solid', cursor:'pointer', fontFamily:'inherit', background:tags.includes(tag)?'var(--accent)':'transparent', color:tags.includes(tag)?'#fff':'var(--muted)', borderColor:tags.includes(tag)?'var(--accent)':'var(--border)' }}>
+            {tag}
+          </button>
+        ))}
+      </div>
+      <div style={{ display:'flex', gap:6 }}>
+        <input className="input" placeholder="Add custom tag…" value={custom} onChange={e=>setCustom(e.target.value)} onKeyDown={e=>e.key==='Enter'&&addCustom()} style={{ fontSize:12, padding:'6px 10px', flex:1 }} />
+        <button onClick={addCustom} disabled={!custom.trim()} style={{ padding:'6px 12px', borderRadius:'var(--r)', border:'1px solid var(--border)', background:'var(--accent-soft)', color:'var(--accent)', cursor:'pointer', fontFamily:'inherit', fontSize:12, fontWeight:600 }}>+ Add</button>
+      </div>
+    </div>
+  )
+}
 
 function ResultCard({ result, onSave, onEdit, onDiscard, saving }) {
   const meta = TYPE_META[result.type]||TYPE_META.unknown
+  const pri = result.priority && PRIORITY_META[result.priority]
   return (
     <div style={{ border:'1px solid var(--border)', borderRadius:'var(--r)', overflow:'hidden' }}>
       <div style={{ background:meta.bg, padding:'14px 16px', display:'flex', alignItems:'center', gap:10 }}>
@@ -26,12 +71,13 @@ function ResultCard({ result, onSave, onEdit, onDiscard, saving }) {
           <div style={{ fontSize:11, fontWeight:600, color:meta.color, textTransform:'uppercase', letterSpacing:.4 }}>{meta.label}{result.confidence?` · ${Math.round(result.confidence*100)}%`:''}</div>
           <div style={{ fontSize:16, fontWeight:500, color:'var(--text)', marginTop:2 }}>{result.title}</div>
         </div>
+        {pri && <span style={{ fontSize:10, fontWeight:700, background:pri.bg, color:pri.color, padding:'2px 9px', borderRadius:10 }}>{pri.label}</span>}
       </div>
       <div style={{ padding:'14px 16px', background:'var(--surface)' }}>
         {result.body && <div style={{ fontSize:13, color:'var(--muted)', marginBottom:12, lineHeight:1.5 }}>{result.body}</div>}
         <div style={{ display:'flex', flexWrap:'wrap', gap:6, marginBottom:14 }}>
-          {result.person&&<span className="pill accent"><i className="ti ti-user" style={{ fontSize:11 }} /> {result.person}</span>}
           {result.due&&<span className="pill accent"><i className="ti ti-calendar" style={{ fontSize:11 }} /> {new Date(result.due).toLocaleDateString('en-IN',{day:'numeric',month:'short'})}</span>}
+          {result.reminder&&<span className="pill accent"><i className="ti ti-bell" style={{ fontSize:11 }} /> {format(new Date(result.reminder),'d MMM · h:mm a')}</span>}
           {result.amount&&<span className="pill accent"><i className="ti ti-currency-rupee" style={{ fontSize:11 }} />{result.amount}</span>}
           {result.tags?.map(t=><span key={t} className="pill">{t}</span>)}
         </div>
@@ -47,23 +93,26 @@ function ResultCard({ result, onSave, onEdit, onDiscard, saving }) {
   )
 }
 
-function EditForm({ result, transcript, onConfirm, onCancel }) {
-  const [editType,   setEditType]   = useState(result.type||'note')
-  const [editTitle,  setEditTitle]  = useState(result.title||'')
-  const [editBody,   setEditBody]   = useState(result.body||'')
-  const [editPerson, setEditPerson] = useState(result.person||'')
-  const [editAmount, setEditAmount] = useState(result.amount!=null?String(result.amount):'')
-  const [editVendor, setEditVendor] = useState(result.vendor||'')
-  const [editDue,    setEditDue]    = useState(result.due?new Date(result.due).toISOString().slice(0,16):'')
-  const [editTags,   setEditTags]   = useState(result.tags||[])
-  const toggleTag = (tag) => setEditTags(prev => prev.includes(tag) ? prev.filter(t=>t!==tag) : [...prev, tag])
+function EditForm({ result, transcript, imgDataUrl, onConfirm, onCancel }) {
+  const [editType,     setEditType]     = useState(result.type||'note')
+  const [editTitle,    setEditTitle]    = useState(result.title||'')
+  const [editBody,     setEditBody]     = useState(result.body||'')
+  const [editAmount,   setEditAmount]   = useState(result.amount!=null?String(result.amount):'')
+  const [editVendor,   setEditVendor]   = useState(result.vendor||'')
+  const [editDue,      setEditDue]      = useState(result.due?new Date(result.due).toISOString().slice(0,16):'')
+  const [editReminder, setEditReminder] = useState(result.reminder?new Date(result.reminder).toISOString().slice(0,16):'')
+  const [editPriority, setEditPriority] = useState(result.priority||'')
+  const [editTags,     setEditTags]     = useState(result.tags||[])
   const meta = TYPE_META[editType]||TYPE_META.unknown
   return (
     <div style={{ border:'1px solid var(--border)', borderRadius:'var(--r)', overflow:'hidden' }}>
-      {transcript && <div style={{ background:'var(--bg)', padding:'10px 14px', borderBottom:'1px solid var(--border)' }}>
-        <div style={{ fontSize:10, fontWeight:600, color:'var(--hint)', textTransform:'uppercase', letterSpacing:.4, marginBottom:3 }}>You said</div>
-        <div style={{ fontSize:12, color:'var(--muted)', lineHeight:1.5, fontStyle:'italic' }}>"{transcript}"</div>
-      </div>}
+      {imgDataUrl && <img src={imgDataUrl} alt="" style={{ width:'100%', maxHeight:160, objectFit:'cover' }} />}
+      {transcript && (
+        <div style={{ background:'var(--bg)', padding:'10px 14px', borderBottom:'1px solid var(--border)' }}>
+          <div style={{ fontSize:10, fontWeight:600, color:'var(--hint)', textTransform:'uppercase', letterSpacing:.4, marginBottom:3 }}>You said</div>
+          <div style={{ fontSize:12, color:'var(--muted)', lineHeight:1.5, fontStyle:'italic' }}>"{transcript}"</div>
+        </div>
+      )}
       <div style={{ background:meta.bg, padding:'10px 14px', borderBottom:'1px solid var(--border)' }}>
         <div style={{ fontSize:11, fontWeight:600, color:meta.color, textTransform:'uppercase', letterSpacing:.4, marginBottom:8 }}>Edit before saving</div>
         <div style={{ display:'flex', gap:6, flexWrap:'wrap' }}>
@@ -76,28 +125,35 @@ function EditForm({ result, transcript, onConfirm, onCancel }) {
       </div>
       <div style={{ padding:'14px 16px', background:'var(--surface)', display:'flex', flexDirection:'column', gap:10 }}>
         <input className="input" placeholder="Title *" value={editTitle} onChange={e=>setEditTitle(e.target.value)} autoFocus />
-        <textarea className="input" placeholder="Notes (optional)" value={editBody} onChange={e=>setEditBody(e.target.value)} style={{ minHeight:70 }} />
-        {(editType==='task'||editType==='person')&&<input className="input" placeholder="Person (optional)" value={editPerson} onChange={e=>setEditPerson(e.target.value)} />}
-        {editType==='task'&&<input className="input" type="datetime-local" value={editDue} onChange={e=>setEditDue(e.target.value)} />}
-        {editType==='expense'&&(
+        <textarea className="input" placeholder="Details (optional)" value={editBody} onChange={e=>setEditBody(e.target.value)} style={{ minHeight:70 }} />
+        {editType==='task' && (
+          <>
+            <div>
+              <div style={{ fontSize:11, fontWeight:600, color:'var(--muted)', textTransform:'uppercase', letterSpacing:.4, marginBottom:6 }}>Priority</div>
+              <div style={{ display:'flex', gap:6 }}>
+                {Object.entries(PRIORITY_META).map(([key,p])=>(
+                  <button key={key} onClick={()=>setEditPriority(editPriority===key?'':key)} style={{ flex:1, padding:'7px 0', borderRadius:'var(--r-sm)', border:'1.5px solid', cursor:'pointer', fontFamily:'inherit', fontSize:12, fontWeight:600, background:editPriority===key?p.bg:'transparent', color:editPriority===key?p.color:'var(--muted)', borderColor:editPriority===key?p.color:'var(--border)' }}>
+                    {p.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <input className="input" type="datetime-local" value={editDue} onChange={e=>setEditDue(e.target.value)} placeholder="Due date (optional)" />
+            <div style={{ display:'flex', alignItems:'center', gap:8 }}>
+              <i className="ti ti-bell" style={{ color:'var(--amber)', fontSize:16, flexShrink:0 }} />
+              <input className="input" type="datetime-local" value={editReminder} onChange={e=>setEditReminder(e.target.value)} style={{ flex:1 }} placeholder="Reminder (optional)" />
+            </div>
+          </>
+        )}
+        {editType==='expense' && (
           <div style={{ display:'flex', gap:8 }}>
             <input className="input" placeholder="Vendor" value={editVendor} onChange={e=>setEditVendor(e.target.value)} style={{ flex:1 }} />
             <input className="input" placeholder="₹ Amount" type="number" min="0" value={editAmount} onChange={e=>setEditAmount(e.target.value)} style={{ width:110 }} />
           </div>
         )}
-        {/* Tag multi-select */}
-        <div>
-          <div style={{ fontSize:11, fontWeight:600, color:'var(--muted)', textTransform:'uppercase', letterSpacing:.4, marginBottom:8 }}>Tags</div>
-          <div style={{ display:'flex', flexWrap:'wrap', gap:6 }}>
-            {PRESET_TAGS.map(tag=>(
-              <button key={tag} onClick={()=>toggleTag(tag)} style={{ padding:'4px 12px', borderRadius:20, fontSize:12, fontWeight:500, border:'1px solid', cursor:'pointer', fontFamily:'inherit', background:editTags.includes(tag)?'var(--accent)':'transparent', color:editTags.includes(tag)?'#fff':'var(--muted)', borderColor:editTags.includes(tag)?'var(--accent)':'var(--border)' }}>
-                {tag}
-              </button>
-            ))}
-          </div>
-        </div>
+        <TagSection tags={editTags} onChange={setEditTags} presets={PRESET_TAGS} />
         <div style={{ display:'flex', gap:8 }}>
-          <button className="btn btn-primary" style={{ flex:1 }} onClick={()=>{ if(!editTitle.trim()) return; onConfirm({ type:editType, title:editTitle.trim(), body:editBody.trim()||null, person:editPerson.trim()||null, amount:editAmount?parseFloat(editAmount):null, vendor:editVendor.trim()||null, due:editDue||null, tags:editTags }) }}>Confirm &amp; save</button>
+          <button className="btn btn-primary" style={{ flex:1 }} onClick={()=>{ if(!editTitle.trim()) return; onConfirm({ type:editType, title:editTitle.trim(), body:editBody.trim()||null, amount:editAmount?parseFloat(editAmount):null, vendor:editVendor.trim()||null, due:editDue||null, reminder:editReminder||null, priority:editPriority||null, tags:editTags }) }}>Confirm &amp; save</button>
           <button className="btn btn-ghost" onClick={onCancel}>Cancel</button>
         </div>
       </div>
@@ -106,10 +162,11 @@ function EditForm({ result, transcript, onConfirm, onCancel }) {
 }
 
 function ImageTasksEditor({ imgAnalysis, imgDataUrl, onSave, onBack }) {
-  const [tasks, setTasks] = useState(imgAnalysis.tasks?.length>0?imgAnalysis.tasks:[imgAnalysis.title])
-  const [due,    setDue]    = useState(imgAnalysis.date?new Date(imgAnalysis.date).toISOString().slice(0,16):'')
-  const [person, setPerson] = useState('')
-  const [saving, setSaving] = useState(false)
+  const [tasks,    setTasks]    = useState(imgAnalysis.tasks?.length>0?imgAnalysis.tasks:[imgAnalysis.title])
+  const [due,      setDue]      = useState(imgAnalysis.date?new Date(imgAnalysis.date).toISOString().slice(0,16):'')
+  const [reminder, setReminder] = useState('')
+  const [priority, setPriority] = useState('')
+  const [saving,   setSaving]   = useState(false)
   const update = (i,val) => setTasks(prev=>prev.map((t,j)=>j===i?val:t))
   const remove = (i) => setTasks(prev=>prev.filter((_,j)=>j!==i))
   const validTasks = tasks.filter(t=>t.trim())
@@ -127,10 +184,21 @@ function ImageTasksEditor({ imgAnalysis, imgDataUrl, onSave, onBack }) {
         ))}
         <button className="btn btn-ghost" style={{ fontSize:13, alignSelf:'flex-start' }} onClick={()=>setTasks(p=>[...p,''])}><i className="ti ti-plus" style={{ fontSize:13 }} /> Add task</button>
       </div>
-      <input className="input" placeholder="Person (optional)" value={person} onChange={e=>setPerson(e.target.value)} style={{ marginBottom:8 }} />
-      <input className="input" type="datetime-local" value={due} onChange={e=>setDue(e.target.value)} style={{ marginBottom:14 }} />
+      <div style={{ fontSize:11, fontWeight:600, color:'var(--muted)', textTransform:'uppercase', letterSpacing:.4, marginBottom:6 }}>Priority</div>
+      <div style={{ display:'flex', gap:6, marginBottom:10 }}>
+        {Object.entries(PRIORITY_META).map(([key,p])=>(
+          <button key={key} onClick={()=>setPriority(priority===key?'':key)} style={{ flex:1, padding:'7px 0', borderRadius:'var(--r-sm)', border:'1.5px solid', cursor:'pointer', fontFamily:'inherit', fontSize:12, fontWeight:600, background:priority===key?p.bg:'transparent', color:priority===key?p.color:'var(--muted)', borderColor:priority===key?p.color:'var(--border)' }}>
+            {p.label}
+          </button>
+        ))}
+      </div>
+      <input className="input" type="datetime-local" value={due} onChange={e=>setDue(e.target.value)} style={{ marginBottom:8 }} placeholder="Due date (optional)" />
+      <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:14 }}>
+        <i className="ti ti-bell" style={{ color:'var(--amber)', fontSize:16, flexShrink:0 }} />
+        <input className="input" type="datetime-local" value={reminder} onChange={e=>setReminder(e.target.value)} style={{ flex:1 }} placeholder="Reminder (optional)" />
+      </div>
       <div style={{ display:'flex', gap:8 }}>
-        <button className="btn btn-primary" style={{ flex:1 }} onClick={async()=>{setSaving(true);await onSave(validTasks,due,person)}} disabled={saving||validTasks.length===0}>
+        <button className="btn btn-primary" style={{ flex:1 }} onClick={async()=>{setSaving(true);await onSave(validTasks,due,reminder,priority)}} disabled={saving||validTasks.length===0}>
           {saving?<><div className="spinner" style={{ width:14, height:14, borderTopColor:'#fff' }}/> Saving…</>:`Save ${validTasks.length} Task${validTasks.length!==1?'s':''}`}
         </button>
         <button className="btn btn-ghost" onClick={onBack} disabled={saving}>Back</button>
@@ -139,9 +207,64 @@ function ImageTasksEditor({ imgAnalysis, imgDataUrl, onSave, onBack }) {
   )
 }
 
-// Photo source picker bottom sheet. File inputs live in the parent (always mounted)
-// so the native picker isn't torn down mid-selection when the sheet closes.
-function PhotoSheet({ onCamera, onGallery, onFiles, onClose }) {
+// Image description editor — preserves the image, lets user add/edit details before saving to vault
+function ImageDescEditor({ imgDataUrl, imgAnalysis, onSave, onBack }) {
+  const [title,  setTitle]  = useState(imgAnalysis?.title||'')
+  const [desc,   setDesc]   = useState(imgAnalysis?.summary||'')
+  const [tags,   setTags]   = useState([])
+  const [saving, setSaving] = useState(false)
+  return (
+    <div style={{ marginTop:16 }}>
+      <img src={imgDataUrl} alt="" style={{ width:'100%', borderRadius:'var(--r)', maxHeight:220, objectFit:'cover', marginBottom:14 }} />
+      <div style={{ fontSize:14, fontWeight:600, marginBottom:10 }}>Add details to this image</div>
+      <input className="input" placeholder="Title" value={title} onChange={e=>setTitle(e.target.value)} style={{ marginBottom:10 }} />
+      <textarea className="input" placeholder="Describe what this image is about…" value={desc} onChange={e=>setDesc(e.target.value)} style={{ minHeight:80, marginBottom:12, fontSize:14 }} autoFocus />
+      <TagSection tags={tags} onChange={setTags} presets={VAULT_PRESET} />
+      <div style={{ display:'flex', gap:8, marginTop:14 }}>
+        <button className="btn btn-primary" style={{ flex:1 }} onClick={async()=>{ setSaving(true); await onSave(title,desc,tags) }} disabled={saving}>
+          {saving?<><div className="spinner" style={{ width:14, height:14, borderTopColor:'#fff' }}/> Saving…</>:'Save to Vault'}
+        </button>
+        <button className="btn btn-ghost" onClick={onBack} disabled={saving}>Back</button>
+      </div>
+    </div>
+  )
+}
+
+// Pre-save vault confirmation sheet — shows before saving image to vault
+function VaultSaveModal({ imgDataUrl, imgAnalysis, onSave, onClose }) {
+  const VAULT_TYPES = ['image','note','receipt','document','screenshot']
+  const [title, setTitle] = useState(imgAnalysis?.title||'')
+  const [desc,  setDesc]  = useState(imgAnalysis?.summary||'')
+  const [type,  setType]  = useState('image')
+  const [tags,  setTags]  = useState([])
+  return (
+    <div style={{ position:'fixed', inset:0, zIndex:400, display:'flex', flexDirection:'column', justifyContent:'flex-end', background:'rgba(0,0,0,0.55)' }} onClick={onClose}>
+      <div style={{ background:'var(--surface)', borderRadius:'20px 20px 0 0', maxHeight:'90dvh', overflowY:'auto', maxWidth:430, margin:'0 auto', width:'100%' }} onClick={e=>e.stopPropagation()}>
+        {imgDataUrl && <img src={imgDataUrl} alt="" style={{ width:'100%', maxHeight:200, objectFit:'cover', borderRadius:'20px 20px 0 0' }} />}
+        <div style={{ padding:'14px 20px calc(20px + env(safe-area-inset-bottom))' }}>
+          <div style={{ width:36, height:4, background:'var(--border)', borderRadius:2, margin:'0 auto 14px' }} />
+          <div style={{ fontSize:11, fontWeight:600, color:'var(--accent)', textTransform:'uppercase', letterSpacing:.4, marginBottom:10 }}>EDITING</div>
+          <input className="input" placeholder="Title" value={title} onChange={e=>setTitle(e.target.value)} style={{ marginBottom:10, fontWeight:500 }} />
+          <textarea className="input" placeholder="Description (AI generated — edit if needed)" value={desc} onChange={e=>setDesc(e.target.value)} style={{ minHeight:70, marginBottom:10, fontSize:13 }} />
+          <div style={{ display:'flex', gap:6, flexWrap:'wrap', marginBottom:12 }}>
+            {VAULT_TYPES.map(t=>(
+              <button key={t} onClick={()=>setType(t)} style={{ padding:'4px 12px', borderRadius:20, fontSize:11, border:'1px solid', cursor:'pointer', fontFamily:'inherit', background:type===t?'var(--accent)':'transparent', color:type===t?'#fff':'var(--muted)', borderColor:type===t?'var(--accent)':'var(--border)' }}>{t}</button>
+            ))}
+          </div>
+          <TagSection tags={tags} onChange={setTags} presets={VAULT_PRESET} />
+          <div style={{ display:'flex', gap:8, marginTop:14 }}>
+            <button className="btn btn-primary" style={{ flex:1 }} onClick={()=>onSave({ title:title.trim()||'Image', desc:desc.trim(), type, tags })}>
+              <i className="ti ti-device-floppy" style={{ fontSize:14 }} /> Confirm &amp; Save
+            </button>
+            <button className="btn btn-ghost" onClick={onClose}>Cancel</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function PhotoSheet({ onCamera, onGallery, onClose }) {
   return (
     <div style={{ position:'fixed', inset:0, zIndex:400, display:'flex', flexDirection:'column', justifyContent:'flex-end', background:'rgba(0,0,0,0.45)' }} onClick={onClose}>
       <div style={{ background:'var(--surface)', borderRadius:'24px 24px 0 0', maxWidth:430, margin:'0 auto', width:'100%', padding:'12px 0 calc(20px + env(safe-area-inset-bottom))' }} onClick={e=>e.stopPropagation()}>
@@ -150,7 +273,6 @@ function PhotoSheet({ onCamera, onGallery, onFiles, onClose }) {
         {[
           { icon:'ti-camera', color:'var(--accent)', bg:'var(--accent-soft)', label:'Camera', sub:'Take a new photo', action:onCamera },
           { icon:'ti-photo',  color:'var(--purple)', bg:'var(--purple-soft)', label:'Gallery', sub:'Choose from gallery', action:onGallery },
-          { icon:'ti-folder', color:'var(--amber)',  bg:'var(--amber-soft)',  label:'Files', sub:'Browse files', action:onFiles },
         ].map(opt=>(
           <button key={opt.label} onClick={opt.action} style={{ display:'flex', alignItems:'center', gap:14, width:'100%', padding:'14px 20px', background:'none', border:'none', cursor:'pointer', fontFamily:'inherit', textAlign:'left' }}>
             <div style={{ width:44, height:44, borderRadius:12, background:opt.bg, display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>
@@ -172,31 +294,36 @@ export default function Capture() {
   const navigate = useNavigate()
   const { captures, addCapture, addTask, addIdea, addExpense, addPerson, addVaultItem, findOrCreatePerson } = useStore()
 
-  const [status, setStatus]           = useState('idle')
-  const preEditStatus                 = useRef('done')
-  const [input, setInput]             = useState('')
-  const [result, setResult]           = useState(null)
-  const [captureSource, setCaptureSource] = useState('text')
+  const [status,          setStatus]          = useState('idle')
+  const preEditStatus                          = useRef('done')
+  const [input,           setInput]           = useState('')
+  const [result,          setResult]          = useState(null)
+  const [captureSource,   setCaptureSource]   = useState('text')
   const [voiceTranscript, setVoiceTranscript] = useState('')
-  const [isListening, setIsListening] = useState(false)
-  const recognitionRef                = useRef(null)
-  const hasVoiceSupport               = typeof window!=='undefined'&&!!(window.SpeechRecognition||window.webkitSpeechRecognition)
-  const [imgDataUrl, setImgDataUrl]   = useState(null)
-  const [imgAnalysis, setImgAnalysis] = useState(null)
-  const [showPhotoSheet, setShowPhotoSheet] = useState(false)
+  const [isListening,     setIsListening]     = useState(false)
+  const recognitionRef                         = useRef(null)
+  const hasVoiceSupport                        = typeof window!=='undefined'&&!!(window.SpeechRecognition||window.webkitSpeechRecognition)
+  const [imgDataUrl,      setImgDataUrl]      = useState(null)
+  const [imgAnalysis,     setImgAnalysis]     = useState(null)
+  const [showPhotoSheet,  setShowPhotoSheet]  = useState(false)
+  const [showVaultSave,   setShowVaultSave]   = useState(false)
   const cameraInputRef  = useRef(null)
   const galleryInputRef = useRef(null)
-  const filesInputRef   = useRef(null)
   const [toast, setToast] = useState(null)
   const showToast = (msg) => { setToast(msg); setTimeout(()=>setToast(null),2500) }
 
-  const resetAll = () => { setStatus('idle'); setInput(''); setResult(null); setVoiceTranscript(''); setImgDataUrl(null); setImgAnalysis(null); setCaptureSource('text') }
+  const resetAll = () => {
+    setStatus('idle'); setInput(''); setResult(null); setVoiceTranscript('')
+    setImgDataUrl(null); setImgAnalysis(null); setCaptureSource('text'); setShowVaultSave(false)
+  }
 
   const saveResult = async (r, source) => {
     if (r.type==='task') {
-      let person_id=null
-      if (r.person) { const p=await findOrCreatePerson(r.person); if(p) person_id=p.id }
-      return addTask({ title:r.title, notes:r.body||null, due_at:r.due||null, status:'todo', progress:0, source:source==='voice'?'voice':'ai_capture', person_id })
+      let person_id = null
+      if (r.person) { const p = await findOrCreatePerson(r.person); if(p) person_id = p.id }
+      const { data, error } = await addTask({ title:r.title, notes:r.body||null, due_at:r.due||null, reminder_at:r.reminder||null, priority:r.priority||null, status:'todo', progress:0, source:source==='voice'?'voice':'ai_capture', person_id })
+      if (!error && r.reminder) scheduleReminder(r.title, r.reminder)
+      return { data, error }
     }
     if (r.type==='idea')    return addIdea({ title:r.title, body:r.body||null, tags:r.tags||[], status:'raw', source:source==='voice'?'voice':'capture' })
     if (r.type==='expense') {
@@ -261,13 +388,14 @@ export default function Capture() {
     rec.onend = async () => {
       setIsListening(false)
       const transcript = finalTranscript.trim()||interimTranscript.trim()
-      if (!transcript) { setStatus('idle'); setVoiceTranscript(''); showToast('Nothing captured — tap mic to try again'); return }
+      if (!transcript) { setStatus('idle'); setVoiceTranscript(''); showToast('Nothing captured'); return }
       setStatus('voice-analyzing')
       try {
         const parsed = await parseCapture(transcript)
-        setResult(parsed); setVoiceTranscript(transcript); setCaptureSource('voice'); preEditStatus.current='voice-editing'; setStatus('voice-editing')
+        setResult(parsed); setVoiceTranscript(transcript); setCaptureSource('voice')
+        preEditStatus.current='voice-editing'; setStatus('voice-editing')
         addCapture({ raw_input:transcript, input_type:'voice', ai_result:parsed, classified_as:parsed.type })
-      } catch { setInput(transcript); setStatus('idle'); setVoiceTranscript(''); showToast('AI parse failed — text kept, tap ✦ to retry') }
+      } catch { setInput(transcript); setStatus('idle'); setVoiceTranscript(''); showToast('AI failed — text kept') }
     }
     try { recognitionRef.current=rec; rec.start() } catch { setIsListening(false); setStatus('idle'); showToast('Could not start microphone') }
   }
@@ -280,7 +408,7 @@ export default function Capture() {
       try {
         const analysis = await analyzeImage(dataUrl); setImgAnalysis(analysis); setStatus('img-confirm')
       } catch {
-        setImgAnalysis({ type:'screenshot', title:file.name?.replace(/\.[^.]+$/,'')||'Image', summary:'Could not analyze.', tasks:[], confidence:0 })
+        setImgAnalysis({ type:'image', title:file.name?.replace(/\.[^.]+$/,'')||'Image', summary:'Could not analyze.', tasks:[], confidence:0 })
         setStatus('img-confirm'); showToast('Could not analyze — choose how to save below')
       }
     }
@@ -288,30 +416,39 @@ export default function Capture() {
   }
   const handleImageFile = (e) => { const f=e.target.files?.[0]; if(f){processImageFile(f);e.target.value=''} }
 
-  const handleImageTasksSave = async (taskTitles, due, personName) => {
-    let person_id=null
-    if (personName.trim()) { const p=await findOrCreatePerson(personName.trim()); if(p) person_id=p.id }
-    for (const title of taskTitles) { if(title.trim()) await addTask({ title:title.trim(), due_at:due||null, status:'todo', progress:0, source:'screenshot', person_id }) }
-    addCapture({ raw_input:imgAnalysis.summary||imgAnalysis.title, input_type:'image', ai_result:imgAnalysis, classified_as:'task' })
+  const handleImageTasksSave = async (taskTitles, due, reminder, priority) => {
+    for (const title of taskTitles) {
+      if (!title.trim()) continue
+      const { error } = await addTask({ title:title.trim(), due_at:due||null, reminder_at:reminder||null, priority:priority||null, status:'todo', progress:0, source:'screenshot' })
+      if (!error && reminder) scheduleReminder(title, reminder)
+    }
+    addCapture({ raw_input:imgAnalysis?.summary||imgAnalysis?.title, input_type:'image', ai_result:imgAnalysis, classified_as:'task' })
     showToast(`${taskTitles.length} task${taskTitles.length!==1?'s':''} saved`); resetAll(); navigate('/tasks')
   }
 
   const handleImageSaveExpense = async () => {
-    if (!imgAnalysis.amount||imgAnalysis.amount<=0) { showToast('No amount detected — save to Vault instead'); return }
+    if (!imgAnalysis?.amount||imgAnalysis.amount<=0) { showToast('No amount detected — save to Vault instead'); return }
     setStatus('img-saving')
     await addExpense({ vendor:imgAnalysis.vendor||imgAnalysis.title, amount:imgAnalysis.amount, date:imgAnalysis.date?.split('T')[0]||new Date().toISOString().split('T')[0], notes:imgAnalysis.summary||null })
     addCapture({ raw_input:imgAnalysis.summary||imgAnalysis.title, input_type:'image', ai_result:imgAnalysis, classified_as:'expense' })
     showToast('Expense saved'); resetAll()
   }
 
-  const handleImageSaveVault = async () => {
+  const handleVaultSave = async ({ title, desc, type, tags }) => {
+    setShowVaultSave(false)
     setStatus('img-saving')
-    await addVaultItem({ title:imgAnalysis.title, file_url:imgDataUrl, ocr_text:imgAnalysis.summary||null, type:'image', tags:[imgAnalysis.type].filter(Boolean) })
-    addCapture({ raw_input:imgAnalysis.summary||imgAnalysis.title, input_type:'image', ai_result:imgAnalysis, classified_as:'note' })
+    await addVaultItem({ title, file_url:imgDataUrl, ocr_text:desc||null, type, tags })
+    addCapture({ raw_input:imgAnalysis?.summary||title, input_type:'image', ai_result:imgAnalysis, classified_as:'note' })
     showToast('Saved to Vault'); resetAll()
   }
 
-  const hideTextUI = ['img-analyzing','img-confirm','img-edit-tasks','img-saving','voice-recording','voice-analyzing','voice-editing'].includes(status)
+  const handleImageDescSave = async (title, desc, tags) => {
+    await addVaultItem({ title:title||imgAnalysis?.title||'Image', file_url:imgDataUrl, ocr_text:desc||imgAnalysis?.summary||null, type:'image', tags })
+    addCapture({ raw_input:desc||imgAnalysis?.summary||title, input_type:'image', ai_result:imgAnalysis, classified_as:'note' })
+    showToast('Saved to Vault'); resetAll()
+  }
+
+  const hideTextUI = ['img-analyzing','img-confirm','img-edit-tasks','img-saving','img-edit-desc','voice-recording','voice-analyzing','voice-editing'].includes(status)
 
   return (
     <div className="page">
@@ -321,8 +458,8 @@ export default function Capture() {
           <i className="ti ti-arrow-left" style={{ fontSize:20 }} />
         </button>
         <div style={{ fontSize:17, fontWeight:600 }}>Capture</div>
-        <button style={{ background:'none', border:'none', cursor:'pointer', padding:4, color:'var(--muted)' }}>
-          <i className="ti ti-dots" style={{ fontSize:20 }} />
+        <button onClick={resetAll} title="Clear / close" style={{ background:'none', border:'none', cursor:'pointer', padding:4, color:'var(--muted)' }}>
+          <i className="ti ti-x" style={{ fontSize:20 }} />
         </button>
       </div>
 
@@ -333,11 +470,11 @@ export default function Capture() {
             <div style={{ fontSize:26, fontWeight:700, lineHeight:1.2, marginBottom:4 }}>What's on your mind?</div>
             <div style={{ fontSize:14, color:'var(--muted)', marginBottom:16 }}>Memora will handle the rest.</div>
 
-            {/* Text area with inline AI Parse button */}
+            {/* Text area with inline Analyse button */}
             <div style={{ position:'relative' }}>
               <textarea
                 className="input"
-                style={{ minHeight:140, fontSize:15, paddingBottom:48, resize:'none' }}
+                style={{ minHeight:140, fontSize:15, paddingBottom:52, resize:'none' }}
                 placeholder="Type anything – task, idea, expense, note…"
                 value={input}
                 onChange={e=>setInput(e.target.value)}
@@ -345,14 +482,13 @@ export default function Capture() {
                 disabled={['parsing','saving'].includes(status)}
                 autoFocus={status==='idle'}
               />
-              {/* AI Parse send-button inside textarea */}
               <button
                 onClick={handleSubmit}
                 disabled={!input.trim()||status==='parsing'}
-                style={{ position:'absolute', bottom:10, right:10, display:'flex', alignItems:'center', gap:5, padding:'7px 13px', borderRadius:'var(--r-full)', border:'none', cursor:'pointer', background:input.trim()?'var(--accent)':'var(--border)', color:input.trim()?'#fff':'var(--muted)', fontSize:12, fontWeight:600, fontFamily:'inherit', transition:'all .2s', touchAction:'manipulation' }}
+                style={{ position:'absolute', bottom:10, right:10, display:'flex', alignItems:'center', gap:5, padding:'7px 14px', borderRadius:'var(--r-full)', border:'none', cursor:'pointer', background:input.trim()?'var(--accent)':'var(--border)', color:input.trim()?'#fff':'var(--muted)', fontSize:12, fontWeight:600, fontFamily:'inherit', touchAction:'manipulation' }}
               >
                 {status==='parsing'?<div className="spinner" style={{ width:12, height:12, borderTopColor:input.trim()?'#fff':'var(--muted)' }} />:<i className="ti ti-sparkles" style={{ fontSize:14 }} />}
-                AI Parse
+                Analyse
               </button>
             </div>
 
@@ -458,20 +594,20 @@ export default function Capture() {
                     <div><div style={{ fontSize:14, fontWeight:500, color:'var(--text)' }}>Save as expense</div><div style={{ fontSize:12, color:'var(--muted)' }}>Log this receipt</div></div>
                   </button>
                 )}
-                <button onClick={()=>{ setResult({ type:'note', title:imgAnalysis.title, body:imgAnalysis.summary||'' }); preEditStatus.current='img-confirm'; setStatus('editing') }} disabled={saving} style={{ display:'flex', alignItems:'center', gap:12, padding:'14px 16px', background:'var(--bg)', border:'1px solid var(--border)', borderRadius:'var(--r)', cursor:'pointer', fontFamily:'inherit', textAlign:'left' }}>
-                  <i className="ti ti-text-recognition" style={{ fontSize:20, color:'var(--green)' }} />
-                  <div><div style={{ fontSize:14, fontWeight:500, color:'var(--text)' }}>Edit text</div><div style={{ fontSize:12, color:'var(--muted)' }}>Extract or edit text (OCR)</div></div>
+                <button onClick={()=>setStatus('img-edit-desc')} disabled={saving} style={{ display:'flex', alignItems:'center', gap:12, padding:'14px 16px', background:'var(--bg)', border:'1px solid var(--border)', borderRadius:'var(--r)', cursor:'pointer', fontFamily:'inherit', textAlign:'left' }}>
+                  <i className="ti ti-edit" style={{ fontSize:20, color:'var(--green)' }} />
+                  <div><div style={{ fontSize:14, fontWeight:500, color:'var(--text)' }}>Add details</div><div style={{ fontSize:12, color:'var(--muted)' }}>Edit title, description &amp; tags</div></div>
                 </button>
-                <button onClick={async()=>{ const r=await parseCapture(imgAnalysis.summary||imgAnalysis.title); setResult(r); preEditStatus.current='done'; setStatus('done') }} disabled={saving} style={{ display:'flex', alignItems:'center', gap:12, padding:'14px 16px', background:'var(--accent-soft)', border:'1.5px solid var(--accent)', borderRadius:'var(--r)', cursor:'pointer', fontFamily:'inherit', textAlign:'left', position:'relative' }}>
+                <button onClick={async()=>{ setStatus('img-saving'); const r=await parseCapture(imgAnalysis.summary||imgAnalysis.title); setResult(r); preEditStatus.current='done'; setStatus('done') }} disabled={saving} style={{ display:'flex', alignItems:'center', gap:12, padding:'14px 16px', background:'var(--accent-soft)', border:'1.5px solid var(--accent)', borderRadius:'var(--r)', cursor:'pointer', fontFamily:'inherit', textAlign:'left' }}>
                   <i className="ti ti-sparkles" style={{ fontSize:20, color:'var(--accent)' }} />
                   <div>
-                    <div style={{ fontSize:14, fontWeight:500, color:'var(--text)', display:'flex', alignItems:'center', gap:6 }}>AI Parse <span style={{ fontSize:10, fontWeight:600, background:'var(--accent)', color:'#fff', padding:'1px 7px', borderRadius:10 }}>Recommended</span></div>
-                    <div style={{ fontSize:12, color:'var(--muted)' }}>Let AI understand &amp; organize</div>
+                    <div style={{ fontSize:14, fontWeight:500, color:'var(--text)', display:'flex', alignItems:'center', gap:6 }}>Analyse &amp; Organise <span style={{ fontSize:10, fontWeight:600, background:'var(--accent)', color:'#fff', padding:'1px 7px', borderRadius:10 }}>AI</span></div>
+                    <div style={{ fontSize:12, color:'var(--muted)' }}>Let AI understand &amp; organise</div>
                   </div>
                 </button>
-                <button onClick={handleImageSaveVault} disabled={saving} style={{ display:'flex', alignItems:'center', gap:12, padding:'14px 16px', background:'var(--bg)', border:'1px solid var(--border)', borderRadius:'var(--r)', cursor:'pointer', fontFamily:'inherit', textAlign:'left' }}>
+                <button onClick={()=>setShowVaultSave(true)} disabled={saving} style={{ display:'flex', alignItems:'center', gap:12, padding:'14px 16px', background:'var(--bg)', border:'1px solid var(--border)', borderRadius:'var(--r)', cursor:'pointer', fontFamily:'inherit', textAlign:'left' }}>
                   <i className="ti ti-photo" style={{ fontSize:20, color:'var(--purple)' }} />
-                  <div><div style={{ fontSize:14, fontWeight:500, color:'var(--text)' }}>Save to vault</div><div style={{ fontSize:12, color:'var(--muted)' }}>Store in vault</div></div>
+                  <div><div style={{ fontSize:14, fontWeight:500, color:'var(--text)' }}>Save to Vault</div><div style={{ fontSize:12, color:'var(--muted)' }}>Review details before saving</div></div>
                 </button>
                 <button onClick={resetAll} disabled={saving} style={{ padding:'14px', background:'transparent', border:'none', cursor:'pointer', fontSize:14, color:'var(--muted)', fontFamily:'inherit' }}>Discard</button>
               </div>
@@ -482,6 +618,11 @@ export default function Capture() {
         {/* IMAGE TASK EDITOR */}
         {status==='img-edit-tasks'&&imgAnalysis&&imgDataUrl && (
           <ImageTasksEditor imgAnalysis={imgAnalysis} imgDataUrl={imgDataUrl} onSave={handleImageTasksSave} onBack={()=>setStatus('img-confirm')} />
+        )}
+
+        {/* IMAGE DESCRIPTION EDITOR */}
+        {status==='img-edit-desc'&&imgAnalysis&&imgDataUrl && (
+          <ImageDescEditor imgDataUrl={imgDataUrl} imgAnalysis={imgAnalysis} onSave={handleImageDescSave} onBack={()=>setStatus('img-confirm')} />
         )}
 
         {/* TEXT EDITING */}
@@ -521,10 +662,7 @@ export default function Capture() {
           return (
             <div key={c.id} style={{ display:'flex', alignItems:'center', gap:12, padding:'12px 14px', background:'var(--surface)', border:'1px solid var(--border)', borderRadius:'var(--r)', marginBottom:8, cursor:dest?'pointer':'default' }} onClick={()=>dest&&navigate(dest)}>
               <div style={{ width:38, height:38, borderRadius:10, background:m.bg, display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>
-                {c.input_type==='image'&&c.ai_result?.file_url
-                  ? <img src={c.ai_result.file_url} alt="" style={{ width:'100%', height:'100%', objectFit:'cover', borderRadius:10 }} />
-                  : <i className={`ti ${m.icon}`} style={{ fontSize:17, color:m.color }} />
-                }
+                <i className={`ti ${m.icon}`} style={{ fontSize:17, color:m.color }} />
               </div>
               <div style={{ flex:1, minWidth:0 }}>
                 <div style={{ fontSize:14, fontWeight:500, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>
@@ -542,18 +680,18 @@ export default function Capture() {
         })}
       </div>
 
-      {/* Always mounted so the native file picker isn't torn down while open */}
       <input ref={cameraInputRef}  type="file" accept="image/*" capture="environment" style={{ display:'none' }} onChange={handleImageFile} />
       <input ref={galleryInputRef} type="file" accept="image/*"                       style={{ display:'none' }} onChange={handleImageFile} />
-      <input ref={filesInputRef}   type="file" accept="image/*,application/pdf"      style={{ display:'none' }} onChange={handleImageFile} />
 
       {showPhotoSheet && (
         <PhotoSheet
           onCamera={()=>{ setShowPhotoSheet(false); cameraInputRef.current?.click() }}
           onGallery={()=>{ setShowPhotoSheet(false); galleryInputRef.current?.click() }}
-          onFiles={()=>{ setShowPhotoSheet(false); filesInputRef.current?.click() }}
           onClose={()=>setShowPhotoSheet(false)}
         />
+      )}
+      {showVaultSave && imgDataUrl && (
+        <VaultSaveModal imgDataUrl={imgDataUrl} imgAnalysis={imgAnalysis} onSave={handleVaultSave} onClose={()=>setShowVaultSave(false)} />
       )}
       {toast&&<div className="toast">{toast}</div>}
     </div>

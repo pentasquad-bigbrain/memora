@@ -7,6 +7,21 @@ const AVATAR_COLORS = ['avatar-blue','avatar-green','avatar-purple','avatar-ambe
 function initials(name) { return name?.split(' ').map(n=>n[0]).join('').toUpperCase().slice(0,2)||'?' }
 function avatarColor(name) { return AVATAR_COLORS[(name?.charCodeAt(0)||0)%AVATAR_COLORS.length] }
 
+export const PRIORITY_META = {
+  low:  { color:'var(--green)',  bg:'var(--green-soft)',  label:'Low' },
+  med:  { color:'var(--amber)',  bg:'var(--amber-soft)',  label:'Medium' },
+  high: { color:'var(--red)',    bg:'var(--red-soft)',    label:'High' },
+}
+
+function scheduleReminder(title, reminderAt) {
+  if (!reminderAt || !('Notification' in window)) return
+  const delay = new Date(reminderAt) - Date.now()
+  if (delay <= 0) return
+  const go = () => new Notification('⏰ Memora Reminder', { body: title, icon: '/memora/icon-192.png' })
+  if (Notification.permission === 'granted') { setTimeout(go, Math.min(delay, 2147483647)); return }
+  Notification.requestPermission().then(p => { if (p === 'granted') setTimeout(go, Math.min(delay, 2147483647)) })
+}
+
 function dueLabel(due) {
   if (!due) return null
   const d = new Date(due)
@@ -99,15 +114,17 @@ function SlideToComplete({ onComplete, label='Slide to complete', accentColor='v
 
 // ── Redesigned QuickAdd ───────────────────────────────────────
 function QuickAdd({ onAdd, onFindPerson }) {
-  const [open,    setOpen]    = useState(false)
-  const [title,   setTitle]   = useState('')
-  const [dueDate, setDueDate] = useState(null)   // 'today' | 'tomorrow' | 'custom'
-  const [customDate, setCustomDate] = useState('')
-  const [allDay,  setAllDay]  = useState(true)
-  const [time,    setTime]    = useState('')
-  const [parsing, setParsing] = useState(false)
-  const [saving,  setSaving]  = useState(false)
-  const [parsed,  setParsed]  = useState(null)
+  const [open,      setOpen]      = useState(false)
+  const [title,     setTitle]     = useState('')
+  const [dueDate,   setDueDate]   = useState(null)
+  const [customDate,setCustomDate]= useState('')
+  const [allDay,    setAllDay]    = useState(true)
+  const [time,      setTime]      = useState('')
+  const [priority,  setPriority]  = useState('')
+  const [reminder,  setReminder]  = useState('')
+  const [parsing,   setParsing]   = useState(false)
+  const [saving,    setSaving]    = useState(false)
+  const [parsed,    setParsed]    = useState(null)
   const [listening, setListening] = useState(false)
   const recognitionRef = useRef(null)
   const inputRef = useRef(null)
@@ -168,8 +185,10 @@ function QuickAdd({ onAdd, onFindPerson }) {
       const p = await onFindPerson(parsed.person)
       if (p) person_id = p.id
     }
-    await onAdd({ title:finalTitle, due_at:buildDueAt(), status:'todo', progress:0, source:'manual', person_id })
-    setTitle(''); setDueDate(null); setCustomDate(''); setAllDay(true); setTime(''); setSaving(false); setParsed(null); setOpen(false)
+    const reminderAt = reminder || null
+    await onAdd({ title:finalTitle, due_at:buildDueAt(), reminder_at:reminderAt, priority:priority||null, status:'todo', progress:0, source:'manual', person_id })
+    if (reminderAt) scheduleReminder(finalTitle, reminderAt)
+    setTitle(''); setDueDate(null); setCustomDate(''); setAllDay(true); setTime(''); setPriority(''); setReminder(''); setSaving(false); setParsed(null); setOpen(false)
   }
 
   const handleKey = (e) => {
@@ -265,6 +284,24 @@ function QuickAdd({ onAdd, onFindPerson }) {
             </div>
           )}
 
+          {/* Priority */}
+          <div style={{ padding:'0 16px 10px' }}>
+            <div style={{ fontSize:12, fontWeight:500, color:'var(--muted)', marginBottom:6 }}>Priority</div>
+            <div style={{ display:'flex', gap:6 }}>
+              {Object.entries(PRIORITY_META).map(([key,p])=>(
+                <button key={key} onClick={()=>setPriority(priority===key?'':key)} style={{ flex:1, padding:'7px 0', borderRadius:'var(--r-sm)', border:'1.5px solid', cursor:'pointer', fontFamily:'inherit', fontSize:12, fontWeight:600, background:priority===key?p.bg:'transparent', color:priority===key?p.color:'var(--muted)', borderColor:priority===key?p.color:'var(--border)' }}>
+                  {p.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Reminder */}
+          <div style={{ padding:'0 16px 12px', display:'flex', alignItems:'center', gap:8 }}>
+            <i className="ti ti-bell" style={{ color:'var(--amber)', fontSize:16, flexShrink:0 }} />
+            <input className="input" type="datetime-local" value={reminder} onChange={e=>setReminder(e.target.value)} style={{ flex:1, fontSize:12 }} />
+          </div>
+
           {/* Actions */}
           <div style={{ padding:'0 16px 14px', display:'flex', gap:8 }}>
             <button className="btn btn-primary" style={{ flex:1 }} onClick={submit} disabled={!title.trim()||saving}>
@@ -294,6 +331,8 @@ function TaskModal({ taskId, onClose, onUpdate, onDelete }) {
   const [editTitle,    setEditTitle]    = useState(task?.title||'')
   const [editNotes,    setEditNotes]    = useState(task?.notes||'')
   const [editDue,      setEditDue]      = useState(task?.due_at?new Date(task.due_at).toISOString().slice(0,16):'')
+  const [editPriority, setEditPriority] = useState(task?.priority||'')
+  const [editReminder, setEditReminder] = useState(task?.reminder_at?new Date(task.reminder_at).toISOString().slice(0,16):'')
   const [editProgress, setEditProgress] = useState(task?.progress||0)
   const [editPersonId, setEditPersonId] = useState(task?.person_id||'')
   const [saving,       setSaving]       = useState(false)
@@ -305,7 +344,9 @@ function TaskModal({ taskId, onClose, onUpdate, onDelete }) {
     if (!editTitle.trim()) return
     setSaving(true)
     const status = editProgress===100?'done':editProgress>0?'in_progress':'todo'
-    await onUpdate(task.id, { title:editTitle.trim(), notes:editNotes.trim()||null, due_at:editDue||null, progress:editProgress, status, person_id:editPersonId||null })
+    const reminderAt = editReminder||null
+    await onUpdate(task.id, { title:editTitle.trim(), notes:editNotes.trim()||null, due_at:editDue||null, priority:editPriority||null, reminder_at:reminderAt, progress:editProgress, status, person_id:editPersonId||null })
+    if (reminderAt) scheduleReminder(editTitle.trim(), reminderAt)
     setSaving(false); onClose()
   }
 
@@ -328,7 +369,21 @@ function TaskModal({ taskId, onClose, onUpdate, onDelete }) {
           </div>
           <input className="input" value={editTitle} onChange={e=>setEditTitle(e.target.value)} style={{ marginBottom:10, fontWeight:500, fontSize:16 }} autoFocus />
           <textarea className="input" placeholder="Notes (optional)" value={editNotes} onChange={e=>setEditNotes(e.target.value)} style={{ marginBottom:10, minHeight:70 }} />
-          <input className="input" type="datetime-local" value={editDue} onChange={e=>setEditDue(e.target.value)} style={{ marginBottom:12 }} />
+          <input className="input" type="datetime-local" value={editDue} onChange={e=>setEditDue(e.target.value)} style={{ marginBottom:10 }} />
+          <div style={{ marginBottom:10 }}>
+            <div style={{ fontSize:12, fontWeight:500, color:'var(--muted)', marginBottom:6 }}>Priority</div>
+            <div style={{ display:'flex', gap:6 }}>
+              {Object.entries(PRIORITY_META).map(([key,p])=>(
+                <button key={key} onClick={()=>setEditPriority(editPriority===key?'':key)} style={{ flex:1, padding:'7px 0', borderRadius:'var(--r-sm)', border:'1.5px solid', cursor:'pointer', fontFamily:'inherit', fontSize:12, fontWeight:600, background:editPriority===key?p.bg:'transparent', color:editPriority===key?p.color:'var(--muted)', borderColor:editPriority===key?p.color:'var(--border)' }}>
+                  {p.label}
+                </button>
+              ))}
+            </div>
+          </div>
+          <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:12 }}>
+            <i className="ti ti-bell" style={{ color:'var(--amber)', fontSize:16, flexShrink:0 }} />
+            <input className="input" type="datetime-local" value={editReminder} onChange={e=>setEditReminder(e.target.value)} style={{ flex:1 }} />
+          </div>
           {people.length>0 && (
             <select className="input" value={editPersonId} onChange={e=>setEditPersonId(e.target.value)} style={{ marginBottom:12 }}>
               <option value="">No person assigned</option>
@@ -564,7 +619,12 @@ export default function Tasks() {
                     <CircularProgress progress={task.progress||0} done={isDone} color={overdue?'var(--red)':'var(--accent)'} onClick={e=>handleToggleDone(e,task)} />
                   </div>
                   <div style={{ flex:1, minWidth:0 }}>
-                    <div style={{ fontSize:14, fontWeight:500, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap', textDecoration:isDone?'line-through':'none', color:isDone?'var(--muted)':'var(--text)' }}>{task.title}</div>
+                    <div style={{ display:'flex', alignItems:'center', gap:6, flexWrap:'wrap' }}>
+                      <div style={{ fontSize:14, fontWeight:500, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap', textDecoration:isDone?'line-through':'none', color:isDone?'var(--muted)':'var(--text)', flex:1, minWidth:0 }}>{task.title}</div>
+                      {task.priority && PRIORITY_META[task.priority] && (
+                        <span style={{ fontSize:9, fontWeight:700, background:PRIORITY_META[task.priority].bg, color:PRIORITY_META[task.priority].color, padding:'1px 7px', borderRadius:10, flexShrink:0, whiteSpace:'nowrap' }}>{PRIORITY_META[task.priority].label}</span>
+                      )}
+                    </div>
                     {due && <div style={{ fontSize:11, color:due.red?'var(--red)':'var(--muted)', marginTop:2, fontWeight:due.red?600:400 }}>{due.text}</div>}
                     {task.notes && <div style={{ fontSize:11, color:'var(--hint)', marginTop:2, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{task.notes}</div>}
                   </div>
