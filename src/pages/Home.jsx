@@ -285,6 +285,63 @@ export default function Home() {
 
       <div className="page-scroll" style={{ paddingTop:4 }}>
 
+        {/* Today's Timeline */}
+        {todayTasks.some(t => t.due_at) && (
+          <>
+            <div className="section-label" style={{ marginTop:18 }}>Today's Timeline</div>
+            <div style={{ display:'flex', gap:8, overflowX:'auto', scrollbarWidth:'none', paddingBottom:4, marginBottom:4 }}>
+              {(() => {
+                const timeSlots = []
+                const now = new Date()
+                const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+
+                // Generate time slots for the day
+                for (let hour = 6; hour < 22; hour++) {
+                  const slotTime = new Date(todayStart)
+                  slotTime.setHours(hour, 0, 0, 0)
+
+                  const tasksInSlot = todayTasks.filter(t => {
+                    if (!t.due_at) return false
+                    const taskTime = new Date(t.due_at)
+                    return taskTime.getHours() === hour && isToday(taskTime)
+                  })
+
+                  if (tasksInSlot.length > 0) {
+                    timeSlots.push({ time: slotTime, tasks: tasksInSlot })
+                  }
+                }
+
+                return timeSlots.length > 0 ? timeSlots.map((slot, idx) => {
+                  const isPast = slot.time < new Date()
+                  const isCurrentHour = slot.time.getHours() === new Date().getHours()
+                  return (
+                    <div key={idx} style={{ display:'flex', flexDirection:'column', alignItems:'center', gap:6, flex:'0 0 110px' }}>
+                      <div style={{ width:'100%', padding:'12px 8px', background:isCurrentHour?'var(--accent-soft)':isPast?'var(--surface)':'var(--bg)', border:`1.5px solid ${isCurrentHour?'var(--accent)':isPast?'var(--border-strong)':'var(--border)'}`, borderRadius:'var(--r)', textAlign:'center' }}>
+                        <div style={{ fontSize:11, fontWeight:600, color:isCurrentHour?'var(--accent)':isPast?'var(--muted)':'var(--text)', marginBottom:6 }}>
+                          {format(slot.time, 'h:mm a')}
+                        </div>
+                        <div style={{ display:'flex', flexDirection:'column', gap:4 }}>
+                          {slot.tasks.slice(0,2).map((task, ti) => (
+                            <div key={ti} style={{ fontSize:11, fontWeight:500, color:'var(--text)', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap', lineHeight:1.2 }}>
+                              {task.title}
+                            </div>
+                          ))}
+                          {slot.tasks.length > 2 && (
+                            <div style={{ fontSize:9, color:'var(--muted)' }}>+{slot.tasks.length - 2} more</div>
+                          )}
+                        </div>
+                      </div>
+                      {isCurrentHour && (
+                        <div style={{ width:6, height:6, borderRadius:'50%', background:'var(--accent)' }} />
+                      )}
+                    </div>
+                  )
+                }) : null
+              })()}
+            </div>
+          </>
+        )}
+
         {/* Day at a glance — horizontal */}
         <div className="section-label" style={{ marginTop:18 }}>Day at a glance</div>
         <div style={{ display:'flex', gap:8, overflowX:'auto', scrollbarWidth:'none', paddingBottom:2 }}>
