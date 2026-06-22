@@ -274,8 +274,14 @@ function VaultSaveModal({ imgDataUrl, imgAnalysis, onSave, onClose }) {
         <div style={{ padding:'14px 20px calc(20px + env(safe-area-inset-bottom))' }}>
           <div style={{ width:36, height:4, background:'var(--border)', borderRadius:2, margin:'0 auto 14px' }} />
           <div style={{ fontSize:11, fontWeight:600, color:'var(--accent)', textTransform:'uppercase', letterSpacing:.4, marginBottom:10 }}>EDITING</div>
-          <input className="input" placeholder="Title" value={title} onChange={e=>setTitle(e.target.value)} style={{ marginBottom:10, fontWeight:500 }} />
-          <textarea className="input" placeholder="Description (AI generated — edit if needed)" value={desc} onChange={e=>setDesc(e.target.value)} style={{ minHeight:70, marginBottom:10, fontSize:13 }} />
+          <div style={{ position:'relative', marginBottom:10 }}>
+            <input className="input" placeholder="Title" value={title} onChange={e=>setTitle(e.target.value)} style={{ fontWeight:500, paddingRight:32 }} />
+            {title && <button onClick={()=>setTitle('')} style={{ position:'absolute', right:10, top:'50%', transform:'translateY(-50%)', background:'none', border:'none', cursor:'pointer', color:'var(--muted)', fontSize:16, padding:4 }} title="Clear title"><i className="ti ti-x" /></button>}
+          </div>
+          <div style={{ position:'relative', marginBottom:10 }}>
+            <textarea className="input" placeholder="Description (AI generated — edit if needed)" value={desc} onChange={e=>setDesc(e.target.value)} style={{ minHeight:70, fontSize:13, paddingRight:32 }} />
+            {desc && <button onClick={()=>setDesc('')} style={{ position:'absolute', right:10, top:10, background:'none', border:'none', cursor:'pointer', color:'var(--muted)', fontSize:16, padding:4 }} title="Clear description"><i className="ti ti-x" /></button>}
+          </div>
           <div style={{ display:'flex', gap:6, flexWrap:'wrap', marginBottom:12 }}>
             {VAULT_TYPES.map(t=>(
               <button key={t} onClick={()=>setType(t)} style={{ padding:'4px 12px', borderRadius:20, fontSize:11, border:'1px solid', cursor:'pointer', fontFamily:'inherit', background:type===t?'var(--accent)':'transparent', color:type===t?'#fff':'var(--muted)', borderColor:type===t?'var(--accent)':'var(--border)' }}>{t}</button>
