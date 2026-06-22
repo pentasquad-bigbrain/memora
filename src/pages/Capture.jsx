@@ -559,7 +559,12 @@ export default function Capture() {
             <div style={{ marginTop:16 }}>
               <img src={imgDataUrl} alt="" style={{ width:'100%', borderRadius:'var(--r)', maxHeight:220, objectFit:'cover', marginBottom:14 }} />
               <div className="card" style={{ marginBottom:14 }}>
-                <div style={{ fontSize:11, fontWeight:600, color:'var(--muted)', textTransform:'uppercase', letterSpacing:.5, marginBottom:6 }}>What I see</div>
+                <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:6 }}>
+                  <div style={{ fontSize:11, fontWeight:600, color:'var(--muted)', textTransform:'uppercase', letterSpacing:.5 }}>What I see</div>
+                  <button onClick={async()=>{ setStatus('img-saving'); await addVaultItem({ title:'Untitled', file_url:imgDataUrl, ocr_text:null, type:'image', tags:[] }); showToast('Saved to Review'); resetAll() }} disabled={saving} style={{ background:'none', border:'none', cursor:'pointer', color:'var(--muted)', fontSize:14, padding:4 }} title="Save as Untitled for review">
+                    <i className="ti ti-x" />
+                  </button>
+                </div>
                 <div style={{ fontSize:16, fontWeight:500, marginBottom:4 }}>{imgAnalysis.title}</div>
                 <div style={{ fontSize:13, color:'var(--muted)', lineHeight:1.5 }}>{imgAnalysis.summary}</div>
                 {imgAnalysis.tasks?.length>0 && (
