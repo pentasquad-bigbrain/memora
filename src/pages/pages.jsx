@@ -1888,9 +1888,7 @@ export function IdeaLab() {
                         setIdeaTaskSaving(true)
                         const finalTitle = ideaTaskInput.trim()
                         const reminderAt = ideaTaskReminder || null
-                        await updateTask(selected.id, {
-                          tasks: [...ideaTasks, { id: crypto.randomUUID(), title: finalTitle, status: 'todo', priority: ideaTaskPriority || null, progress: 0, reminder_at: reminderAt }]
-                        })
+                        await addTask({ title: finalTitle, status: 'todo', priority: ideaTaskPriority || null, progress: 0, reminder_at: reminderAt, source: 'idea', notes: `[idea:${selected.id}]` })
                         if (reminderAt) scheduleReminder(finalTitle, reminderAt)
                         setIdeaTaskInput('')
                         setIdeaTaskPriority('')
@@ -1976,9 +1974,7 @@ export function IdeaLab() {
                           setIdeaTaskSaving(true)
                           const finalTitle = ideaTaskInput.trim()
                           const reminderAt = ideaTaskReminder || null
-                          await updateTask(selected.id, {
-                            tasks: [...ideaTasks, { id: crypto.randomUUID(), title: finalTitle, status: 'todo', priority: ideaTaskPriority || null, progress: 0, reminder_at: reminderAt }]
-                          })
+                          await addTask({ title: finalTitle, status: 'todo', priority: ideaTaskPriority || null, progress: 0, reminder_at: reminderAt, source: 'idea', notes: `[idea:${selected.id}]` })
                           if (reminderAt) scheduleReminder(finalTitle, reminderAt)
                           setIdeaTaskInput('')
                           setIdeaTaskPriority('')
