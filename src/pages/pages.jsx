@@ -206,6 +206,7 @@ function VaultItemModal({ item, onClose, onDelete, onUpdate }) {
   const [confirming, setConfirming] = useState(false)
   const [editing,    setEditing]    = useState(false)
   const [saving,     setSaving]     = useState(false)
+  const [analyzing,  setAnalyzing]  = useState(false)
   const [editTitle,  setEditTitle]  = useState(item.title || '')
   const [editDesc,   setEditDesc]   = useState(item.ocr_text || '')
   const [editType,   setEditType]   = useState(item.type || 'note')
@@ -216,6 +217,23 @@ function VaultItemModal({ item, onClose, onDelete, onUpdate }) {
     await onUpdate(item.id, { title: editTitle.trim() || 'Untitled', ocr_text: editDesc.trim() || null, type: editType })
     setSaving(false)
     setEditing(false)
+  }
+
+  const handleAIAnalyze = async () => {
+    if (!item.file_url) return
+    setAnalyzing(true)
+    try {
+      const analysis = await analyzeImage(item.file_url)
+      if (analysis) {
+        setEditTitle(analysis.title || editTitle)
+        setEditDesc(analysis.summary || editDesc)
+        if (analysis.type) setEditType(analysis.type)
+      }
+    } catch (err) {
+      console.error('AI analysis failed:', err)
+    } finally {
+      setAnalyzing(false)
+    }
   }
 
   return (
@@ -236,6 +254,11 @@ function VaultItemModal({ item, onClose, onDelete, onUpdate }) {
           {editing ? (
             <>
               <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--accent)', textTransform: 'uppercase', letterSpacing: .4, marginBottom: 10 }}>Editing</div>
+              {item.file_url && (
+                <button onClick={handleAIAnalyze} disabled={analyzing} style={{ width: '100%', padding: '10px 14px', marginBottom: 10, background: 'var(--accent-soft)', border: '1px solid var(--accent)', borderRadius: 'var(--r)', cursor: 'pointer', fontFamily: 'inherit', fontSize: 12, fontWeight: 600, color: 'var(--accent)', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
+                  {analyzing ? <><div className="spinner" style={{ width: 12, height: 12, borderTopColor: 'var(--accent)' }} /> Analyzing…</> : <><i className="ti ti-sparkles" style={{ fontSize: 14 }} /> Fill with AI</>}
+                </button>
+              )}
               <input className="input" value={editTitle} onChange={e => setEditTitle(e.target.value)} style={{ marginBottom: 10, fontWeight: 500 }} placeholder="Title" autoFocus />
               <textarea className="input" value={editDesc} onChange={e => setEditDesc(e.target.value)} style={{ minHeight: 80, marginBottom: 10, fontSize: 13 }} placeholder="Description / content" />
               <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 14 }}>
@@ -261,7 +284,7 @@ function VaultItemModal({ item, onClose, onDelete, onUpdate }) {
               <div style={{ fontSize: 18, fontWeight: 500, marginBottom: 6 }}>{item.title || 'Untitled'}</div>
               <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 12 }}>
                 <span style={{ fontSize: 10, fontWeight: 500, background: meta.bg, color: meta.color, padding: '3px 10px', borderRadius: 20 }}>{item.type}</span>
-                {item.tags?.map(t => <span key={t} className="pill" style={{ fontSize: 10 }}>{t}</span>)}
+                {item.tags?.map(t => <span key={t} style={{ fontSize: 10, fontWeight: 500, background: 'var(--bg)', color: 'var(--text)', padding: '3px 10px', borderRadius: 20, border: '1px solid var(--border)' }}>{t}</span>)}
                 <span style={{ fontSize: 10, color: 'var(--hint)', padding: '3px 0' }}>{item.created_at ? format(new Date(item.created_at), 'd MMM yyyy') : ''}</span>
               </div>
               {item.ocr_text && (
@@ -304,7 +327,7 @@ function VaultTagSection({ tags, onChange }) {
       <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: .4, marginBottom: 10 }}>Tags</div>
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 10 }}>
         {all.map(tag => (
-          <button key={tag} onClick={() => toggle(tag)} style={{ padding: '6px 14px', borderRadius: 20, fontSize: 13, fontWeight: 500, border: '1px solid', cursor: 'pointer', fontFamily: 'inherit', background: tags.includes(tag) ? 'var(--accent)' : 'transparent', color: tags.includes(tag) ? '#fff' : 'var(--muted)', borderColor: tags.includes(tag) ? 'var(--accent)' : 'var(--border)' }}>
+          <button key={tag} onClick={() => toggle(tag)} style={{ padding: '6px 14px', borderRadius: 20, fontSize: 13, fontWeight: 500, border: '1.5px solid', cursor: 'pointer', fontFamily: 'inherit', background: tags.includes(tag) ? 'var(--accent)' : 'var(--bg)', color: tags.includes(tag) ? '#fff' : 'var(--text)', borderColor: tags.includes(tag) ? 'var(--accent)' : 'var(--border)' }}>
             {tag}
           </button>
         ))}
