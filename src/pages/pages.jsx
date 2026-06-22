@@ -650,9 +650,19 @@ export function Vault() {
   }
 
   const handleUpdate = async (id, updates) => {
-    const { error } = await updateVaultItem(id, updates)
-    if (!error) { showToast('Updated'); setSelected(null) }
-    else showToast('Update failed')
+    try {
+      const { error } = await updateVaultItem(id, updates)
+      if (!error) {
+        showToast('Updated')
+        setSelected(null)
+      } else {
+        console.error('Update error:', error)
+        showToast('Update failed: ' + (error?.message || 'Unknown error'))
+      }
+    } catch (err) {
+      console.error('Update exception:', err)
+      showToast('Update failed: ' + err.message)
+    }
   }
 
   const handleDeleteSelected = async () => {
