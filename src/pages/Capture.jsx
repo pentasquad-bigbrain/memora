@@ -599,10 +599,6 @@ export default function Capture() {
                     <div><div style={{ fontSize:14, fontWeight:500, color:'var(--text)' }}>Save as expense</div><div style={{ fontSize:12, color:'var(--muted)' }}>Log this receipt</div></div>
                   </button>
                 )}
-                <button onClick={()=>setStatus('img-edit-desc')} disabled={saving} style={{ display:'flex', alignItems:'center', gap:12, padding:'14px 16px', background:'var(--bg)', border:'1px solid var(--border)', borderRadius:'var(--r)', cursor:'pointer', fontFamily:'inherit', textAlign:'left' }}>
-                  <i className="ti ti-edit" style={{ fontSize:20, color:'var(--green)' }} />
-                  <div><div style={{ fontSize:14, fontWeight:500, color:'var(--text)' }}>Add details</div><div style={{ fontSize:12, color:'var(--muted)' }}>Edit title, description &amp; tags</div></div>
-                </button>
                 <button onClick={async()=>{ setStatus('img-saving'); const r=await parseCapture(imgAnalysis.summary||imgAnalysis.title); setResult(r); preEditStatus.current='done'; setStatus('done') }} disabled={saving} style={{ display:'flex', alignItems:'center', gap:12, padding:'14px 16px', background:'var(--accent-soft)', border:'1.5px solid var(--accent)', borderRadius:'var(--r)', cursor:'pointer', fontFamily:'inherit', textAlign:'left' }}>
                   <i className="ti ti-sparkles" style={{ fontSize:20, color:'var(--accent)' }} />
                   <div>

@@ -25,6 +25,9 @@ export default function Menu() {
   const [theme, setTheme] = useState(() => localStorage.getItem('memora-theme') || 'light')
   const [deleteConfirm, setDeleteConfirm] = useState(null)
   const [deleting, setDeleting] = useState(false)
+  const [editProfile, setEditProfile] = useState(false)
+  const [editName, setEditName] = useState(user?.user_metadata?.full_name || '')
+  const [savingProfile, setSavingProfile] = useState(false)
 
   const firstName = user?.user_metadata?.full_name?.split(' ')[0] || 'there'
   const fullName  = user?.user_metadata?.full_name || firstName
@@ -47,6 +50,22 @@ export default function Menu() {
   const handleLogout = async () => {
     await supabase.auth.signOut()
     navigate('/')
+  }
+
+  const handleSaveProfile = async () => {
+    if (!editName.trim()) return
+    setSavingProfile(true)
+    try {
+      const { error } = await supabase.auth.updateUser({
+        data: { full_name: editName.trim() }
+      })
+      if (error) throw error
+      setEditProfile(false)
+    } catch (err) {
+      console.error('Profile update failed:', err)
+    } finally {
+      setSavingProfile(false)
+    }
   }
 
   return (
@@ -77,7 +96,42 @@ export default function Menu() {
             <div style={{ fontSize:18, fontWeight:700 }}>{fullName}</div>
             <div style={{ fontSize:13, color:'var(--muted)', marginTop:2 }}>{email}</div>
           </div>
+          <button
+            onClick={() => { setEditName(fullName); setEditProfile(true) }}
+            style={{ width:36, height:36, borderRadius:'50%', border:'1px solid var(--border)', background:'var(--bg)', cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', color:'var(--muted)', flexShrink:0 }}
+            title="Edit profile">
+            <i className="ti ti-pencil" style={{ fontSize:16 }} />
+          </button>
         </div>
+
+        {/* Edit profile modal */}
+        {editProfile && (
+          <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.5)', display:'flex', alignItems:'center', justifyContent:'center', zIndex:1000 }}>
+            <div style={{ background:'var(--surface)', borderRadius:'var(--r)', padding:24, maxWidth:400, width:'100%', margin:'0 16px' }}>
+              <div style={{ fontSize:18, fontWeight:700, marginBottom:16 }}>Edit Profile</div>
+              <input
+                type="text"
+                value={editName}
+                onChange={(e) => setEditName(e.target.value)}
+                placeholder="Full name"
+                style={{ width:'100%', padding:'10px 12px', fontSize:14, border:'1px solid var(--border)', borderRadius:'var(--r-sm)', background:'var(--bg)', color:'var(--text)', fontFamily:'inherit', marginBottom:16 }}
+              />
+              <div style={{ display:'flex', gap:8 }}>
+                <button
+                  onClick={() => setEditProfile(false)}
+                  style={{ flex:1, padding:'10px 16px', borderRadius:'var(--r-sm)', border:'1px solid var(--border)', background:'none', cursor:'pointer', fontFamily:'inherit', fontSize:14, color:'var(--text)' }}>
+                  Cancel
+                </button>
+                <button
+                  onClick={handleSaveProfile}
+                  disabled={!editName.trim() || savingProfile}
+                  style={{ flex:1, padding:'10px 16px', borderRadius:'var(--r-sm)', border:'none', background:'var(--accent)', color:'#fff', cursor:'pointer', fontFamily:'inherit', fontSize:14, fontWeight:600, opacity: (!editName.trim() || savingProfile) ? 0.5 : 1 }}>
+                  {savingProfile ? 'Saving…' : 'Save'}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Theme toggle row (also visible inline) */}
         <div style={{ background:'var(--bg)', borderRadius:'var(--r)', border:'1px solid var(--border)', padding:'12px 16px', display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:16 }}>

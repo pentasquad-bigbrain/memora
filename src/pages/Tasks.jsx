@@ -651,12 +651,12 @@ export default function Tasks() {
               )}
               <div
                 className="card"
-                style={{ marginBottom:10, opacity:isDone?.55:1, cursor:'pointer', borderLeft:overdue?'3px solid var(--red)':todayDue?'3px solid var(--accent)':'none', paddingLeft:overdue||todayDue?13:16 }}
+                style={{ marginBottom:10, opacity:isDone?.55:1, cursor:'pointer', borderLeft:(task.priority&&PRIORITY_META[task.priority])?`3px solid ${PRIORITY_META[task.priority].color}`:overdue?'3px solid var(--red)':todayDue?'3px solid var(--accent)':'none', paddingLeft:(task.priority&&PRIORITY_META[task.priority])||overdue||todayDue?13:16 }}
                 onClick={()=>setSelectedId(task.id)}
               >
                 <div style={{ display:'flex', alignItems:'flex-start', gap:10, marginBottom: isDone?0:10 }}>
                   <div onClick={e=>e.stopPropagation()}>
-                    <CircularProgress progress={task.progress||0} done={isDone} color={overdue?'var(--red)':'var(--accent)'} onClick={e=>handleToggleDone(e,task)} />
+                    <CircularProgress progress={task.progress||0} done={isDone} color={task.priority&&PRIORITY_META[task.priority]?PRIORITY_META[task.priority].color:overdue?'var(--red)':'var(--accent)'} onClick={e=>handleToggleDone(e,task)} />
                   </div>
                   <div style={{ flex:1, minWidth:0 }}>
                     <div style={{ display:'flex', alignItems:'center', gap:6, flexWrap:'wrap' }}>
@@ -677,7 +677,7 @@ export default function Tasks() {
                 </div>
                 {!isDone && (
                   <div onClick={e=>e.stopPropagation()} style={{ paddingLeft:50 }}>
-                    <SlideToComplete accentColor={overdue?'var(--red)':'var(--accent)'} onComplete={()=>updateTask(task.id,{ status:'done', progress:100 })} />
+                    <SlideToComplete accentColor={task.priority&&PRIORITY_META[task.priority]?PRIORITY_META[task.priority].color:overdue?'var(--red)':'var(--accent)'} onComplete={()=>updateTask(task.id,{ status:'done', progress:100 })} />
                   </div>
                 )}
               </div>

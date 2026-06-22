@@ -1764,6 +1764,9 @@ export function IdeaLab() {
   const [search,     setSearch]     = useState('')
   const [showAttach, setShowAttach] = useState(false)
   const [ideaTaskInput, setIdeaTaskInput] = useState('')
+  const [ideaTaskPriority, setIdeaTaskPriority] = useState('')
+  const [ideaTaskReminder, setIdeaTaskReminder] = useState('')
+  const [ideaTaskReminderMenu, setIdeaTaskReminderMenu] = useState(false)
   const [ideaTaskSaving, setIdeaTaskSaving] = useState(false)
   const [toast, showToast] = useToast()
 
@@ -1837,14 +1840,6 @@ export function IdeaLab() {
         </div>
 
         <div className="page-scroll" style={{ paddingTop: 16 }}>
-          <div style={{ display: 'flex', gap: 6, marginBottom: 16, flexWrap: 'wrap' }}>
-            {Object.entries(STATUS_META).map(([key, meta]) => (
-              <button key={key} onClick={() => handleStatusChange(selected, key)} style={{ padding: '5px 14px', borderRadius: 20, fontSize: 12, fontWeight: 600, border: '1.5px solid', cursor: 'pointer', fontFamily: 'inherit', background: (selected.status||'raw') === key ? meta.bg : 'transparent', color: (selected.status||'raw') === key ? meta.color : 'var(--muted)', borderColor: (selected.status||'raw') === key ? meta.color : 'var(--border)' }}>
-                {meta.label}
-              </button>
-            ))}
-          </div>
-
           <div className="card" style={{ marginBottom: 16 }}>
             <div style={{ fontSize: 18, fontWeight: 600, marginBottom: 6 }}>{selected.title}</div>
             {selected.body && <div style={{ fontSize: 14, color: 'var(--muted)', lineHeight: 1.6 }}>{selected.body}</div>}
@@ -1868,19 +1863,151 @@ export function IdeaLab() {
           {(selected._activeIdeaTab || 'tasks') === 'tasks' && (
             <div style={{ marginBottom: 16 }}>
               {ideaTasks.length > 0 && (
-                <div style={{ marginBottom: 10 }}>
+                <div style={{ marginBottom: 12 }}>
                   {ideaTasks.map(t => (
-                    <div key={t.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px', background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: 'var(--r-sm)', marginBottom: 6 }}>
-                      <i className={`ti ${t.status === 'done' ? 'ti-circle-check' : t.status === 'in_progress' ? 'ti-loader' : 'ti-circle'}`} style={{ fontSize: 16, color: t.status === 'done' ? 'var(--green)' : t.status === 'in_progress' ? 'var(--accent)' : 'var(--border-strong)', flexShrink: 0 }} />
+                    <div key={t.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px', paddingLeft: (t.priority && PRIORITY_META[t.priority]) ? 10 : 12, background: 'var(--bg)', border: '1px solid var(--border)', borderLeft: (t.priority && PRIORITY_META[t.priority]) ? `3px solid ${PRIORITY_META[t.priority].color}` : '1px solid var(--border)', borderRadius: 'var(--r-sm)', marginBottom: 6 }}>
+                      <i className={`ti ${t.status === 'done' ? 'ti-circle-check' : t.status === 'in_progress' ? 'ti-loader' : 'ti-circle'}`} style={{ fontSize: 16, color: t.status === 'done' ? 'var(--green)' : t.status === 'in_progress' ? 'var(--accent)' : (t.priority && PRIORITY_META[t.priority]) ? PRIORITY_META[t.priority].color : 'var(--border-strong)', flexShrink: 0 }} />
                       <span style={{ flex: 1, fontSize: 13, color: t.status === 'done' ? 'var(--muted)' : 'var(--text)', textDecoration: t.status === 'done' ? 'line-through' : 'none' }}>{t.title}</span>
+                      {t.priority && PRIORITY_META[t.priority] && <span style={{ fontSize: 9, fontWeight: 700, background: PRIORITY_META[t.priority].bg, color: PRIORITY_META[t.priority].color, padding: '1px 7px', borderRadius: 10, whiteSpace: 'nowrap' }}>{PRIORITY_META[t.priority].label}</span>}
                       {t.status !== 'done' && <span style={{ fontSize: 10, color: 'var(--muted)' }}>{t.progress}%</span>}
                     </div>
                   ))}
                 </div>
               )}
-              <button onClick={() => navigate('/tasks')} className="btn btn-ghost" style={{ width: '100%', fontSize: 13, gap: 6 }}>
-                <i className="ti ti-plus" style={{ fontSize: 14 }} /> Add task
-              </button>
+
+              {/* Task creation input */}
+              <div style={{ marginBottom: 10 }}>
+                <input
+                  type="text"
+                  placeholder="Add task..."
+                  value={ideaTaskInput}
+                  onChange={(e) => setIdeaTaskInput(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && ideaTaskInput.trim()) {
+                      const addIdeaTask = async () => {
+                        setIdeaTaskSaving(true)
+                        const finalTitle = ideaTaskInput.trim()
+                        const reminderAt = ideaTaskReminder || null
+                        await updateTask(selected.id, {
+                          tasks: [...ideaTasks, { id: crypto.randomUUID(), title: finalTitle, status: 'todo', priority: ideaTaskPriority || null, progress: 0, reminder_at: reminderAt }]
+                        })
+                        if (reminderAt) scheduleReminder(finalTitle, reminderAt)
+                        setIdeaTaskInput('')
+                        setIdeaTaskPriority('')
+                        setIdeaTaskReminder('')
+                        setIdeaTaskSaving(false)
+                      }
+                      addIdeaTask()
+                    }
+                  }}
+                  style={{ width: '100%', padding: '10px 12px', fontSize: 13, border: '1px solid var(--border)', borderRadius: 'var(--r-sm)', background: 'var(--bg)', color: 'var(--text)', fontFamily: 'inherit', marginBottom: 8 }}
+                />
+
+                {/* Priority selector */}
+                <div style={{ display: 'flex', gap: 6, marginBottom: 8, alignItems: 'center' }}>
+                  {Object.entries(PRIORITY_META).map(([key, p]) => (
+                    <button
+                      key={key}
+                      onClick={() => setIdeaTaskPriority(ideaTaskPriority === key ? '' : key)}
+                      style={{
+                        padding: '6px 10px',
+                        borderRadius: 'var(--r-sm)',
+                        border: '1.5px solid',
+                        cursor: 'pointer',
+                        fontFamily: 'inherit',
+                        fontSize: 11,
+                        fontWeight: 600,
+                        background: ideaTaskPriority === key ? p.bg : 'transparent',
+                        color: ideaTaskPriority === key ? p.color : 'var(--muted)',
+                        borderColor: ideaTaskPriority === key ? p.color : 'var(--border)'
+                      }}>
+                      {p.label}
+                    </button>
+                  ))}
+
+                  {/* Reminder bell */}
+                  <div style={{ marginLeft: 'auto', position: 'relative', display: 'flex', gap: 6, alignItems: 'center' }}>
+                    <button
+                      onClick={() => setIdeaTaskReminderMenu(!ideaTaskReminderMenu)}
+                      style={{
+                        width: 32,
+                        height: 32,
+                        borderRadius: '50%',
+                        border: '1.5px solid',
+                        borderColor: ideaTaskReminder ? 'var(--amber)' : 'var(--border)',
+                        background: ideaTaskReminder ? 'var(--amber-soft)' : 'transparent',
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        color: ideaTaskReminder ? 'var(--amber)' : 'var(--muted)',
+                        fontSize: 16,
+                        fontFamily: 'inherit'
+                      }}
+                      title="Set reminder">
+                      <i className={`ti ${ideaTaskReminder ? 'ti-bell-filled' : 'ti-bell'}`} />
+                    </button>
+                    {ideaTaskReminderMenu && (
+                      <div style={{ position: 'absolute', top: 36, right: 0, background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--r)', boxShadow: '0 4px 12px rgba(0,0,0,0.15)', zIndex: 10, minWidth: 120 }}>
+                        {[{ label: '5 min', mins: 5 }, { label: '15 min', mins: 15 }, { label: '30 min', mins: 30 }, { label: '1 hour', mins: 60 }].map(opt => (
+                          <button
+                            key={opt.mins}
+                            onClick={() => {
+                              setIdeaTaskReminder(new Date(Date.now() + opt.mins * 60000).toISOString().slice(0, 16))
+                              setIdeaTaskReminderMenu(false)
+                            }}
+                            style={{ display: 'block', width: '100%', padding: '10px 12px', background: 'none', border: 'none', cursor: 'pointer', textAlign: 'left', fontSize: 12, color: 'var(--text)', borderBottom: '1px solid var(--border)', fontFamily: 'inherit' }}>
+                            {opt.label}
+                          </button>
+                        ))}
+                        <button
+                          onClick={() => { setIdeaTaskReminder(''); setIdeaTaskReminderMenu(false) }}
+                          style={{ display: 'block', width: '100%', padding: '10px 12px', background: 'none', border: 'none', cursor: 'pointer', textAlign: 'left', fontSize: 12, color: 'var(--red)', fontFamily: 'inherit' }}>
+                          Clear
+                        </button>
+                      </div>
+                    )}
+
+                    {/* Submit button */}
+                    <button
+                      onClick={() => {
+                        const addIdeaTask = async () => {
+                          if (!ideaTaskInput.trim()) return
+                          setIdeaTaskSaving(true)
+                          const finalTitle = ideaTaskInput.trim()
+                          const reminderAt = ideaTaskReminder || null
+                          await updateTask(selected.id, {
+                            tasks: [...ideaTasks, { id: crypto.randomUUID(), title: finalTitle, status: 'todo', priority: ideaTaskPriority || null, progress: 0, reminder_at: reminderAt }]
+                          })
+                          if (reminderAt) scheduleReminder(finalTitle, reminderAt)
+                          setIdeaTaskInput('')
+                          setIdeaTaskPriority('')
+                          setIdeaTaskReminder('')
+                          setIdeaTaskSaving(false)
+                        }
+                        addIdeaTask()
+                      }}
+                      disabled={!ideaTaskInput.trim() || ideaTaskSaving}
+                      style={{
+                        width: 32,
+                        height: 32,
+                        borderRadius: '50%',
+                        border: '1.5px solid',
+                        borderColor: ideaTaskInput.trim() && !ideaTaskSaving ? 'var(--green)' : 'var(--border)',
+                        background: ideaTaskInput.trim() && !ideaTaskSaving ? 'var(--green-soft)' : 'transparent',
+                        cursor: ideaTaskInput.trim() && !ideaTaskSaving ? 'pointer' : 'default',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        color: ideaTaskInput.trim() && !ideaTaskSaving ? 'var(--green)' : 'var(--muted)',
+                        fontSize: 16,
+                        fontFamily: 'inherit'
+                      }}>
+                        {ideaTaskSaving ? <div className="spinner" style={{ width: 12, height: 12 }} /> : <i className="ti ti-check" />}
+                      </button>
+                  </div>
+                </div>
+              </div>
             </div>
           )}
 

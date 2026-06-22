@@ -313,7 +313,7 @@ export default function Home() {
               <SlideToComplete
                 taskTitle={task.title}
                 onComplete={() => updateTask(task.id, { status:'done', progress:100 })}
-                accentColor={overdue ? 'var(--red)' : 'var(--accent)'}
+                accentColor={task.priority && PRIORITY_META[task.priority] ? PRIORITY_META[task.priority].color : (overdue ? 'var(--red)' : 'var(--accent)')}
               />
             </div>
           )
