@@ -2,9 +2,70 @@ import { useState, useEffect, useRef, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useStore } from '../lib/store'
 import { generateNudges } from '../lib/groq'
-import { format } from 'date-fns'
+import { format, isPast, isToday } from 'date-fns'
 import Skeleton from '../components/shared/Skeleton'
 import { PRIORITY_META } from './Tasks'
+
+// Slide-to-complete gesture
+function SlideToComplete({ taskTitle, onComplete, accentColor='var(--accent)' }) {
+  const trackRef = useRef(null)
+  const [dragX, setDragX] = useState(0)
+  const [dragging, setDragging] = useState(false)
+  const [completing, setCompleting] = useState(false)
+  const maxDragRef = useRef(0)
+  const thumbSize = 30
+
+  const handlePointerDown = (e) => {
+    if (completing) return
+    const track = trackRef.current
+    if (!track) return
+    maxDragRef.current = track.offsetWidth - thumbSize - 6
+    setDragging(true)
+    e.currentTarget.setPointerCapture?.(e.pointerId)
+  }
+  const handlePointerMove = (e) => {
+    if (!dragging) return
+    const track = trackRef.current
+    if (!track) return
+    const rect = track.getBoundingClientRect()
+    const x = e.clientX - rect.left - thumbSize/2
+    setDragX(Math.max(0, Math.min(maxDragRef.current, x)))
+  }
+  const handlePointerUp = () => {
+    if (!dragging) return
+    setDragging(false)
+    const max = maxDragRef.current||1
+    if (dragX/max > 0.7) { setCompleting(true); setDragX(max); onComplete() }
+    else setDragX(0)
+  }
+
+  return (
+    <div
+      ref={trackRef}
+      onPointerDown={handlePointerDown}
+      onPointerMove={handlePointerMove}
+      onPointerUp={handlePointerUp}
+      onPointerCancel={handlePointerUp}
+      style={{ position:'relative', height:40, borderRadius:20, background:'var(--bg)', border:'1px solid var(--border)', overflow:'hidden', touchAction:'none', userSelect:'none' }}
+    >
+      <div style={{ position:'absolute', inset:0, display:'flex', alignItems:'center', justifyContent:'center', gap:4, fontSize:12, fontWeight:600, color:'var(--muted)', pointerEvents:'none', paddingRight:20 }}>
+        <i className="ti ti-chevrons-right" style={{ fontSize:14 }} /> Slide to complete
+      </div>
+      <div
+        style={{
+          position:'absolute', top:5, left:5, width:thumbSize, height:thumbSize, borderRadius:'50%',
+          background: completing ? 'var(--green)' : accentColor,
+          display:'flex', alignItems:'center', justifyContent:'center',
+          transform:`translateX(${dragX}px)`,
+          transition: dragging ? 'none' : 'transform .25s ease',
+          cursor: completing ? 'default' : 'grab',
+        }}
+      >
+        <i className={`ti ${completing?'ti-check':'ti-chevron-right'}`} style={{ fontSize:14, color:'#fff' }} />
+      </div>
+    </div>
+  )
+}
 
 const AVATAR_COLORS = ['avatar-blue','avatar-green','avatar-purple','avatar-amber','avatar-red']
 function initials(name) { return name?.split(' ').map(n=>n[0]).join('').toUpperCase().slice(0,2)||'?' }
@@ -91,7 +152,7 @@ function SearchOverlay({ onClose, tasks, ideas, people, vaultItems, expenses }) 
 
 export default function Home() {
   const navigate = useNavigate()
-  const { user, spaces, activeSpace, setActiveSpace, tasks, ideas, people, expenses, vaultItems, captures, nudges, dismissNudge, addNudges, addSpace, loading } = useStore()
+  const { user, spaces, activeSpace, setActiveSpace, tasks, ideas, people, expenses, vaultItems, captures, nudges, dismissNudge, addNudges, addSpace, updateTask, loading } = useStore()
 
   const [showSpaceModal, setShowSpaceModal] = useState(false)
   const [showSearch, setShowSearch] = useState(false)
@@ -238,25 +299,25 @@ export default function Home() {
             </div>
             <i className="ti ti-chevron-right" style={{ color:'var(--hint)', fontSize:16, marginLeft:'auto', flexShrink:0 }} />
           </div>
-        ) : todayTasks.map(task => (
-          <div key={task.id} className="card" style={{ marginBottom:8, cursor:'pointer', paddingLeft:'13px' }} onClick={()=>navigate('/tasks')}>
-            <div style={{ display:'flex', alignItems:'flex-start', gap:10 }}>
-              <div style={{ width:22, height:22, borderRadius:'50%', border:'2px solid var(--border-strong)', flexShrink:0, marginTop:1 }} />
-              <div style={{ flex:1, minWidth:0 }}>
-                <div style={{ display:'flex', alignItems:'center', gap:6, flexWrap:'wrap' }}>
-                  <div style={{ fontSize:14, fontWeight:500, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap', flex:1, minWidth:0 }}>{task.title}</div>
-                  {task.priority && PRIORITY_META[task.priority] && (
-                    <span style={{ fontSize:8, fontWeight:700, background:PRIORITY_META[task.priority].bg, color:PRIORITY_META[task.priority].color, padding:'1px 6px', borderRadius:10, flexShrink:0, whiteSpace:'nowrap' }}>{PRIORITY_META[task.priority].label}</span>
-                  )}
-                </div>
-                {task.due_at && <div style={{ fontSize:11, color:'var(--muted)', marginTop:2 }}>{format(new Date(task.due_at),'h:mm a')}</div>}
-                <div style={{ marginTop:8 }}>
-                  <div className="progress-bar"><div className="progress-fill" style={{ width:`${task.progress}%` }} /></div>
-                </div>
+        ) : todayTasks.map(task => {
+          const overdue = task.due_at && isPast(new Date(task.due_at)) && !isToday(new Date(task.due_at))
+          return (
+            <div key={task.id} style={{ marginBottom:10 }}>
+              <div style={{ display:'flex', alignItems:'center', gap:10, marginBottom:6 }}>
+                <div style={{ fontSize:13, fontWeight:500, flex:1 }}>{task.title}</div>
+                {task.priority && PRIORITY_META[task.priority] && (
+                  <span style={{ fontSize:8, fontWeight:700, background:PRIORITY_META[task.priority].bg, color:PRIORITY_META[task.priority].color, padding:'1px 6px', borderRadius:10, whiteSpace:'nowrap' }}>{PRIORITY_META[task.priority].label}</span>
+                )}
               </div>
+              {task.due_at && <div style={{ fontSize:10, color:overdue?'var(--red)':'var(--muted)', marginBottom:6, fontWeight:overdue?600:400 }}>{format(new Date(task.due_at),'h:mm a')}</div>}
+              <SlideToComplete
+                taskTitle={task.title}
+                onComplete={() => updateTask(task.id, { status:'done', progress:100 })}
+                accentColor={overdue ? 'var(--red)' : 'var(--accent)'}
+              />
             </div>
-          </div>
-        ))}
+          )
+        })}
 
         {/* Smart Insights (horizontal scroll tiles) */}
         {nudges.length>0 && (
