@@ -284,17 +284,17 @@ function VaultTagSection({ tags, onChange }) {
   const all = [...new Set([...VAULT_PRESET_TAGS, ...tags.filter(t => !VAULT_PRESET_TAGS.includes(t))])]
   return (
     <div style={{ marginTop: 10 }}>
-      <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: .4, marginBottom: 8 }}>Tags</div>
-      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 8 }}>
+      <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: .4, marginBottom: 10 }}>Tags</div>
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 10 }}>
         {all.map(tag => (
-          <button key={tag} onClick={() => toggle(tag)} style={{ padding: '4px 12px', borderRadius: 20, fontSize: 12, fontWeight: 500, border: '1px solid', cursor: 'pointer', fontFamily: 'inherit', background: tags.includes(tag) ? 'var(--accent)' : 'transparent', color: tags.includes(tag) ? '#fff' : 'var(--muted)', borderColor: tags.includes(tag) ? 'var(--accent)' : 'var(--border)' }}>
+          <button key={tag} onClick={() => toggle(tag)} style={{ padding: '6px 14px', borderRadius: 20, fontSize: 13, fontWeight: 500, border: '1px solid', cursor: 'pointer', fontFamily: 'inherit', background: tags.includes(tag) ? 'var(--accent)' : 'transparent', color: tags.includes(tag) ? '#fff' : 'var(--muted)', borderColor: tags.includes(tag) ? 'var(--accent)' : 'var(--border)' }}>
             {tag}
           </button>
         ))}
       </div>
       <div style={{ display: 'flex', gap: 6 }}>
-        <input className="input" placeholder="Add tag…" value={custom} onChange={e => setCustom(e.target.value)} onKeyDown={e => e.key === 'Enter' && addCustom()} style={{ fontSize: 12, padding: '6px 10px', flex: 1 }} />
-        <button onClick={addCustom} disabled={!custom.trim()} style={{ padding: '6px 12px', borderRadius: 'var(--r)', border: '1px solid var(--border)', background: 'var(--accent-soft)', color: 'var(--accent)', cursor: 'pointer', fontFamily: 'inherit', fontSize: 12, fontWeight: 600 }}>+ Add</button>
+        <input className="input" placeholder="Add tag…" value={custom} onChange={e => setCustom(e.target.value)} onKeyDown={e => e.key === 'Enter' && addCustom()} style={{ fontSize: 12, padding: '8px 12px', flex: 1 }} />
+        <button onClick={addCustom} disabled={!custom.trim()} style={{ padding: '8px 14px', borderRadius: 'var(--r)', border: '1px solid var(--border)', background: 'var(--accent-soft)', color: 'var(--accent)', cursor: 'pointer', fontFamily: 'inherit', fontSize: 13, fontWeight: 600 }}>+ Add</button>
       </div>
     </div>
   )
@@ -580,6 +580,9 @@ export function Vault() {
   const unclearedImages = vaultItems.filter(v => v.type === 'image' && (!v.ocr_text || v.ocr_text.trim().length < 25))
 
   const filtered = vaultItems.filter(v => {
+    if (cat === 'review') {
+      return v.type === 'image' && (!v.ocr_text || v.ocr_text.trim().length < 25)
+    }
     if (cat !== 'all' && v.type !== cat) return false
     if (search && !v.title?.toLowerCase().includes(search.toLowerCase()) && !v.ocr_text?.toLowerCase().includes(search.toLowerCase())) return false
     return true
@@ -662,10 +665,17 @@ export function Vault() {
       )}
 
       <div style={{ padding: '0 16px' }}>
-        <div style={{ display: 'flex', gap: 6, padding: '10px 0', overflowX: 'auto', scrollbarWidth: 'none' }}>
-          {VAULT_CATS.map(c => (
-            <button key={c} className={`pill ${cat === c ? 'active' : ''}`} onClick={() => setCat(c)} style={{ textTransform: 'capitalize' }}>{c}</button>
+        <div style={{ display: 'flex', gap: 6, padding: '10px 0', overflowX: 'auto', scrollbarWidth: 'none', alignItems: 'center' }}>
+          {['review', ...VAULT_CATS].map(c => (
+            <button key={c} className={`pill ${cat === c ? 'active' : ''}`} onClick={() => setCat(c)} style={{ textTransform: 'capitalize', fontSize: 12, fontWeight: c === 'review' ? 600 : 500 }}>
+              {c === 'review' ? '📋 Review' : c}
+            </button>
           ))}
+          <div style={{ marginLeft: 'auto', display: 'flex', gap: 6 }}>
+            <button onClick={() => {}} style={{ background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: 'var(--r-sm)', padding: '6px 10px', cursor: 'pointer', fontSize: 12, color: 'var(--muted)', fontFamily: 'inherit', display: 'flex', alignItems: 'center', gap: 4 }}>
+              <i className="ti ti-filter" style={{ fontSize: 13 }} /> Filter
+            </button>
+          </div>
         </div>
       </div>
 
@@ -1762,39 +1772,78 @@ export function IdeaLab() {
             )}
           </div>
 
-          {/* Tasks for this idea */}
-          <div style={{ marginBottom: 16 }}>
-            <div className="section-label" style={{ marginBottom: 10 }}>Tasks</div>
-            {ideaTasks.length > 0 && (
-              <div style={{ marginBottom: 10 }}>
-                {ideaTasks.map(t => (
-                  <div key={t.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px', background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: 'var(--r-sm)', marginBottom: 6 }}>
-                    <i className={`ti ${t.status === 'done' ? 'ti-circle-check' : t.status === 'in_progress' ? 'ti-loader' : 'ti-circle'}`} style={{ fontSize: 16, color: t.status === 'done' ? 'var(--green)' : t.status === 'in_progress' ? 'var(--accent)' : 'var(--border-strong)', flexShrink: 0 }} />
-                    <span style={{ flex: 1, fontSize: 13, color: t.status === 'done' ? 'var(--muted)' : 'var(--text)', textDecoration: t.status === 'done' ? 'line-through' : 'none' }}>{t.title}</span>
-                    {t.status !== 'done' && <span style={{ fontSize: 10, color: 'var(--muted)' }}>{t.progress}%</span>}
-                  </div>
-                ))}
-              </div>
-            )}
-            <div style={{ display: 'flex', gap: 8 }}>
-              <input
-                className="input"
-                placeholder="Add a task for this idea…"
-                value={ideaTaskInput}
-                onChange={e => setIdeaTaskInput(e.target.value)}
-                onKeyDown={e => { if (e.key === 'Enter') handleAddIdeaTask() }}
-                style={{ flex: 1, fontSize: 14 }}
-              />
-              <button
-                className="btn btn-primary"
-                onClick={handleAddIdeaTask}
-                disabled={!ideaTaskInput.trim() || ideaTaskSaving}
-                style={{ padding: '12px 14px', minWidth: 46 }}
-              >
-                {ideaTaskSaving ? <div className="spinner" style={{ width: 14, height: 14, borderTopColor: '#fff' }} /> : <i className="ti ti-plus" style={{ fontSize: 16 }} />}
+          {/* Tabs: Tasks / Attachments / Notes */}
+          <div className="tabs" style={{ marginBottom: 16 }}>
+            {[['tasks', 'Tasks'], ['attachments', 'Attachments'], ['notes', 'Notes']].map(([key, label]) => (
+              <button key={key} className={`tab ${selected._activeIdeaTab === key ? 'active' : ''}`} onClick={() => setSelected(s => ({ ...s, _activeIdeaTab: key }))} style={{ flex: 1, fontSize: 12 }}>
+                {label}
+              </button>
+            ))}
+          </div>
+
+          {/* Tasks section */}
+          {(selected._activeIdeaTab || 'tasks') === 'tasks' && (
+            <div style={{ marginBottom: 16 }}>
+              {ideaTasks.length > 0 && (
+                <div style={{ marginBottom: 10 }}>
+                  {ideaTasks.map(t => (
+                    <div key={t.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px', background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: 'var(--r-sm)', marginBottom: 6 }}>
+                      <i className={`ti ${t.status === 'done' ? 'ti-circle-check' : t.status === 'in_progress' ? 'ti-loader' : 'ti-circle'}`} style={{ fontSize: 16, color: t.status === 'done' ? 'var(--green)' : t.status === 'in_progress' ? 'var(--accent)' : 'var(--border-strong)', flexShrink: 0 }} />
+                      <span style={{ flex: 1, fontSize: 13, color: t.status === 'done' ? 'var(--muted)' : 'var(--text)', textDecoration: t.status === 'done' ? 'line-through' : 'none' }}>{t.title}</span>
+                      {t.status !== 'done' && <span style={{ fontSize: 10, color: 'var(--muted)' }}>{t.progress}%</span>}
+                    </div>
+                  ))}
+                </div>
+              )}
+              <button onClick={() => navigate('/tasks')} className="btn btn-ghost" style={{ width: '100%', fontSize: 13, gap: 6 }}>
+                <i className="ti ti-plus" style={{ fontSize: 14 }} /> Add task
               </button>
             </div>
-          </div>
+          )}
+
+          {/* Attachments section */}
+          {(selected._activeIdeaTab || 'tasks') === 'attachments' && (
+            <div style={{ marginBottom: 16 }}>
+              <button onClick={() => {}} className="btn btn-primary" style={{ width: '100%', marginBottom: 10, gap: 6 }}>
+                <i className="ti ti-plus" style={{ fontSize: 14 }} /> Attach vault items
+              </button>
+              {selected._attachments?.length > 0 ? (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                  {selected._attachments.map(att => {
+                    const vm = VAULT_META[att.type] || VAULT_META.note
+                    return (
+                      <div key={att.id} style={{ display: 'flex', gap: 10, padding: '10px 12px', background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: 'var(--r-sm)', alignItems: 'flex-start' }}>
+                        <i className={`ti ${vm.icon}`} style={{ fontSize: 16, color: vm.color, marginTop: 2, flexShrink: 0 }} />
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ fontSize: 13, fontWeight: 500, marginBottom: 2 }}>{att.title || 'Untitled'}</div>
+                          <div style={{ fontSize: 11, color: 'var(--muted)', marginBottom: 4 }}>{vm.icon.replace('ti-', '').toUpperCase()}</div>
+                          {att.ocr_text && <div style={{ fontSize: 11, color: 'var(--muted)', overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' }}>{att.ocr_text}</div>}
+                        </div>
+                        <button onClick={() => setSelected(s => ({ ...s, _attachments: s._attachments?.filter(a => a.id !== att.id) || [] }))} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--hint)', padding: 2 }}>
+                          <i className="ti ti-x" style={{ fontSize: 14 }} />
+                        </button>
+                      </div>
+                    )
+                  })}
+                </div>
+              ) : (
+                <div style={{ textAlign: 'center', padding: '20px 0', color: 'var(--muted)', fontSize: 12 }}>No attachments yet. Add vault items to attach.</div>
+              )}
+            </div>
+          )}
+
+          {/* Notes section */}
+          {(selected._activeIdeaTab || 'tasks') === 'notes' && (
+            <div style={{ marginBottom: 16 }}>
+              <textarea
+                placeholder="Add sudden thoughts or notes here…"
+                value={selected._notes || ''}
+                onChange={e => setSelected(s => ({ ...s, _notes: e.target.value }))}
+                style={{ background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: 'var(--r)', padding: '12px 14px', minHeight: 120, fontSize: 13, fontFamily: 'inherit', color: 'var(--text)', resize: 'vertical', width: '100%', boxSizing: 'border-box' }}
+              />
+              <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 6 }}>Auto-saved</div>
+            </div>
+          )}
 
           <button className="btn btn-ghost" style={{ width: '100%', gap: 8, marginBottom: 16 }} onClick={() => handleExpand(selected)} disabled={loading}>
             {loading ? <><div className="spinner" style={{ width: 14, height: 14 }} /> Thinking…</> : <><i className="ti ti-sparkles" style={{ fontSize: 15 }} /> {expansion ? 'Re-expand' : 'Expand with AI'}</>}

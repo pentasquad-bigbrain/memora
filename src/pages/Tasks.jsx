@@ -296,10 +296,12 @@ function QuickAdd({ onAdd, onFindPerson }) {
             </div>
           </div>
 
-          {/* Reminder */}
+          {/* Reminder — bell button only */}
           <div style={{ padding:'0 16px 12px', display:'flex', alignItems:'center', gap:8 }}>
-            <i className="ti ti-bell" style={{ color:'var(--amber)', fontSize:16, flexShrink:0 }} />
-            <input className="input" type="datetime-local" value={reminder} onChange={e=>setReminder(e.target.value)} style={{ flex:1, fontSize:12 }} />
+            <button onClick={()=>setReminder(reminder?'':new Date(Date.now()+15*60000).toISOString().slice(0,16))} style={{ width:36, height:36, borderRadius:'50%', border:'1.5px solid', borderColor:reminder?'var(--amber)':'var(--border)', background:reminder?'var(--amber-soft)':'transparent', cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', color:reminder?'var(--amber)':'var(--muted)', fontSize:18 }} title="Set reminder (15 min from now)">
+              <i className={`ti ${reminder?'ti-bell-filled':'ti-bell'}`} style={{ fontSize:18 }} />
+            </button>
+            <span style={{ fontSize:12, color:'var(--muted)' }}>{reminder?'Reminder set':'Set reminder'}</span>
           </div>
 
           {/* Actions */}
@@ -381,8 +383,10 @@ function TaskModal({ taskId, onClose, onUpdate, onDelete }) {
             </div>
           </div>
           <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:12 }}>
-            <i className="ti ti-bell" style={{ color:'var(--amber)', fontSize:16, flexShrink:0 }} />
-            <input className="input" type="datetime-local" value={editReminder} onChange={e=>setEditReminder(e.target.value)} style={{ flex:1 }} />
+            <button onClick={()=>setEditReminder(editReminder?'':new Date(Date.now()+15*60000).toISOString().slice(0,16))} style={{ width:36, height:36, borderRadius:'50%', border:'1.5px solid', borderColor:editReminder?'var(--amber)':'var(--border)', background:editReminder?'var(--amber-soft)':'transparent', cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', color:editReminder?'var(--amber)':'var(--muted)', fontSize:18, flexShrink:0 }} title="Set reminder (15 min from now)">
+              <i className={`ti ${editReminder?'ti-bell-filled':'ti-bell'}`} style={{ fontSize:18 }} />
+            </button>
+            <span style={{ fontSize:12, color:'var(--muted)' }}>{editReminder?'Reminder set':'Set reminder'}</span>
           </div>
           {people.length>0 && (
             <select className="input" value={editPersonId} onChange={e=>setEditPersonId(e.target.value)} style={{ marginBottom:12 }}>

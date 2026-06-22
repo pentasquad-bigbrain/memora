@@ -4,6 +4,7 @@ import { useStore } from '../lib/store'
 import { generateNudges } from '../lib/groq'
 import { format } from 'date-fns'
 import Skeleton from '../components/shared/Skeleton'
+import { PRIORITY_META } from './Tasks'
 
 const AVATAR_COLORS = ['avatar-blue','avatar-green','avatar-purple','avatar-amber','avatar-red']
 function initials(name) { return name?.split(' ').map(n=>n[0]).join('').toUpperCase().slice(0,2)||'?' }
@@ -94,6 +95,7 @@ export default function Home() {
 
   const [showSpaceModal, setShowSpaceModal] = useState(false)
   const [showSearch, setShowSearch] = useState(false)
+  const [showNotifications, setShowNotifications] = useState(false)
 
   // Draggable IdeaLab FAB
   const [ideaPos, setIdeaPos] = useState(() => { try { return JSON.parse(localStorage.getItem('ideaLabPos')) } catch { return null } })
@@ -150,7 +152,7 @@ export default function Home() {
       {/* Header */}
       <div style={{ padding:'max(14px,env(safe-area-inset-top)) 16px 0', display:'flex', justifyContent:'space-between', alignItems:'center' }}>
         <div style={{ display:'flex', alignItems:'center', gap:8 }}>
-          <div style={{ position:'relative', cursor:'pointer' }} onClick={()=>{}}>
+          <div style={{ position:'relative', cursor:'pointer' }} onClick={()=>setShowNotifications(true)}>
             <i className="ti ti-bell" style={{ fontSize:24, color:nudges.length>0?'var(--accent)':'var(--muted)' }} />
             {nudges.length>0 && <div style={{ position:'absolute', top:-3, right:-3, background:'var(--accent)', color:'#fff', borderRadius:10, fontSize:9, fontWeight:700, minWidth:16, height:16, display:'flex', alignItems:'center', justifyContent:'center', padding:'0 3px' }}>{nudges.length}</div>}
           </div>
@@ -202,28 +204,28 @@ export default function Home() {
 
       <div className="page-scroll" style={{ paddingTop:4 }}>
 
-        {/* Day at a glance */}
+        {/* Day at a glance — horizontal */}
         <div className="section-label" style={{ marginTop:18 }}>Day at a glance</div>
-        <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:10 }}>
+        <div style={{ display:'flex', gap:8, overflowX:'auto', scrollbarWidth:'none', paddingBottom:2 }}>
           {loading ? Array.from({ length:4 }).map((_,i) => (
-            <div key={i} style={{ background:'var(--bg)', borderRadius:'var(--r)', padding:'14px 16px', border:'1px solid var(--border)', display:'flex', flexDirection:'column', gap:8 }}>
-              <Skeleton width={34} height={34} radius={10} />
-              <Skeleton width="50%" height={20} />
-              <Skeleton width="70%" height={12} />
+            <div key={i} style={{ background:'var(--bg)', borderRadius:'var(--r)', padding:'10px 12px', border:'1px solid var(--border)', display:'flex', flexDirection:'column', gap:6, flex:'0 0 100px' }}>
+              <Skeleton width={28} height={28} radius={8} />
+              <Skeleton width="70%" height={16} />
+              <Skeleton width="60%" height={10} />
             </div>
           )) : STAT_TILES.map(s => (
-            <div key={s.label} onClick={()=>navigate(s.dest)} style={{ background:'var(--bg)', borderRadius:'var(--r)', padding:'14px 16px', cursor:'pointer', border:'1px solid var(--border)', display:'flex', flexDirection:'column', gap:4 }}>
-              <div style={{ width:34, height:34, borderRadius:10, background:s.bg, display:'flex', alignItems:'center', justifyContent:'center' }}>
-                <i className={`ti ${s.icon}`} style={{ fontSize:18, color:s.color }} />
+            <div key={s.label} onClick={()=>navigate(s.dest)} style={{ background:'var(--bg)', borderRadius:'var(--r)', padding:'10px 12px', cursor:'pointer', border:'1px solid var(--border)', display:'flex', flexDirection:'column', gap:3, flex:'0 0 95px', textAlign:'center' }}>
+              <div style={{ width:28, height:28, borderRadius:8, background:s.bg, display:'flex', alignItems:'center', justifyContent:'center', margin:'0 auto' }}>
+                <i className={`ti ${s.icon}`} style={{ fontSize:14, color:s.color }} />
               </div>
-              <div style={{ fontSize:24, fontWeight:700, color:'var(--text)', marginTop:4 }}>{s.val}</div>
-              <div style={{ fontSize:13, fontWeight:500, color:'var(--text)' }}>{s.label}</div>
-              <div style={{ fontSize:11, color:'var(--muted)' }}>{s.sub}</div>
+              <div style={{ fontSize:16, fontWeight:700, color:'var(--text)' }}>{s.val}</div>
+              <div style={{ fontSize:11, fontWeight:500, color:'var(--text)' }}>{s.label}</div>
+              <div style={{ fontSize:9, color:'var(--muted)' }}>{s.sub}</div>
             </div>
           ))}
         </div>
 
-        {/* Focus board */}
+        {/* Focus board — expanded */}
         <div className="section-label" style={{ marginTop:20 }}>Focus board</div>
         {todayTasks.length===0 ? (
           <div style={{ background:'var(--bg)', border:'1px solid var(--border)', borderRadius:'var(--r)', padding:'20px 16px', display:'flex', alignItems:'center', gap:14 }}>
@@ -236,12 +238,17 @@ export default function Home() {
             </div>
             <i className="ti ti-chevron-right" style={{ color:'var(--hint)', fontSize:16, marginLeft:'auto', flexShrink:0 }} />
           </div>
-        ) : todayTasks.slice(0,3).map(task => (
-          <div key={task.id} className="card" style={{ marginBottom:8, cursor:'pointer' }} onClick={()=>navigate('/tasks')}>
+        ) : todayTasks.map(task => (
+          <div key={task.id} className="card" style={{ marginBottom:8, cursor:'pointer', paddingLeft:'13px' }} onClick={()=>navigate('/tasks')}>
             <div style={{ display:'flex', alignItems:'flex-start', gap:10 }}>
               <div style={{ width:22, height:22, borderRadius:'50%', border:'2px solid var(--border-strong)', flexShrink:0, marginTop:1 }} />
               <div style={{ flex:1, minWidth:0 }}>
-                <div style={{ fontSize:14, fontWeight:500, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{task.title}</div>
+                <div style={{ display:'flex', alignItems:'center', gap:6, flexWrap:'wrap' }}>
+                  <div style={{ fontSize:14, fontWeight:500, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap', flex:1, minWidth:0 }}>{task.title}</div>
+                  {task.priority && PRIORITY_META[task.priority] && (
+                    <span style={{ fontSize:8, fontWeight:700, background:PRIORITY_META[task.priority].bg, color:PRIORITY_META[task.priority].color, padding:'1px 6px', borderRadius:10, flexShrink:0, whiteSpace:'nowrap' }}>{PRIORITY_META[task.priority].label}</span>
+                  )}
+                </div>
                 {task.due_at && <div style={{ fontSize:11, color:'var(--muted)', marginTop:2 }}>{format(new Date(task.due_at),'h:mm a')}</div>}
                 <div style={{ marginTop:8 }}>
                   <div className="progress-bar"><div className="progress-fill" style={{ width:`${task.progress}%` }} /></div>
@@ -250,11 +257,6 @@ export default function Home() {
             </div>
           </div>
         ))}
-        {todayTasks.length>3 && (
-          <button className="see-all" style={{ padding:'8px 0', display:'block', fontSize:13 }} onClick={()=>navigate('/tasks')}>
-            +{todayTasks.length-3} more tasks →
-          </button>
-        )}
 
         {/* Smart Insights (horizontal scroll tiles) */}
         {nudges.length>0 && (
@@ -301,6 +303,52 @@ export default function Home() {
 
       {showSearch && <SearchOverlay onClose={()=>setShowSearch(false)} tasks={tasks} ideas={ideas} people={people} vaultItems={vaultItems} expenses={expenses} />}
       {showSpaceModal && <AddSpaceModal onClose={()=>setShowSpaceModal(false)} onSave={addSpace} />}
+
+      {/* Notifications center */}
+      {showNotifications && (
+        <div style={{ position:'fixed', inset:0, zIndex:300, display:'flex', flexDirection:'column', justifyContent:'flex-end', background:'rgba(0,0,0,0.45)' }} onClick={()=>setShowNotifications(false)}>
+          <div style={{ background:'var(--surface)', borderRadius:'20px 20px 0 0', maxHeight:'75dvh', overflowY:'auto', maxWidth:430, margin:'0 auto', width:'100%' }} onClick={e=>e.stopPropagation()}>
+            <div style={{ padding:'16px 20px calc(20px + env(safe-area-inset-bottom))' }}>
+              <div style={{ width:36, height:4, background:'var(--border)', borderRadius:2, margin:'0 auto 16px' }} />
+              <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:16 }}>
+                <div style={{ fontSize:18, fontWeight:600 }}>Notifications</div>
+                <button onClick={()=>setShowNotifications(false)} style={{ background:'none', border:'none', cursor:'pointer', color:'var(--muted)', fontSize:18, padding:0 }}>
+                  <i className="ti ti-x" />
+                </button>
+              </div>
+
+              {nudges.length === 0 ? (
+                <div style={{ textAlign:'center', padding:'40px 20px', color:'var(--muted)' }}>
+                  <div style={{ fontSize:32, marginBottom:10 }}>📭</div>
+                  <div style={{ fontSize:14, fontWeight:500, marginBottom:4 }}>All caught up!</div>
+                  <div style={{ fontSize:12 }}>No notifications right now</div>
+                </div>
+              ) : (
+                <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
+                  {nudges.map(n => {
+                    const meta = INSIGHT_ICONS[n.type] || INSIGHT_ICONS.general
+                    const dest = n.entity_type === 'task' ? '/tasks' : n.entity_type === 'person' ? '/people' : n.entity_type === 'idea' ? '/idealab' : n.entity_type === 'expense' ? '/vault' : null
+                    return (
+                      <div key={n.id} style={{ display:'flex', gap:12, padding:'12px 14px', background:'var(--bg)', border:'1px solid var(--border)', borderRadius:'var(--r)', alignItems:'flex-start' }}>
+                        <div style={{ width:36, height:36, borderRadius:10, background:meta.bg, display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>
+                          <i className={`ti ${meta.icon}`} style={{ fontSize:16, color:meta.color }} />
+                        </div>
+                        <div style={{ flex:1, minWidth:0 }}>
+                          <div style={{ fontSize:12, fontWeight:600, color:'var(--text)', marginBottom:2 }}>{meta.label}</div>
+                          <div style={{ fontSize:12, color:'var(--muted)', lineHeight:1.4 }}>{n.message}</div>
+                        </div>
+                        <button onClick={e=>{e.stopPropagation();dismissNudge(n.id)}} style={{ background:'none', border:'none', cursor:'pointer', padding:4, color:'var(--hint)', flexShrink:0 }}>
+                          <i className="ti ti-x" style={{ fontSize:14 }} />
+                        </button>
+                      </div>
+                    )
+                  })}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
