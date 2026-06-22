@@ -101,6 +101,7 @@ function EditForm({ result, transcript, imgDataUrl, onConfirm, onCancel }) {
   const [editVendor,   setEditVendor]   = useState(result.vendor||'')
   const [editDue,      setEditDue]      = useState(result.due?new Date(result.due).toISOString().slice(0,16):'')
   const [editReminder, setEditReminder] = useState(result.reminder?new Date(result.reminder).toISOString().slice(0,16):'')
+  const [editReminderMenu, setEditReminderMenu] = useState(false)
   const [editPriority, setEditPriority] = useState(result.priority||'')
   const [editTags,     setEditTags]     = useState(result.tags||[])
   const meta = TYPE_META[editType]||TYPE_META.unknown
@@ -139,9 +140,23 @@ function EditForm({ result, transcript, imgDataUrl, onConfirm, onCancel }) {
               </div>
             </div>
             <input className="input" type="datetime-local" value={editDue} onChange={e=>setEditDue(e.target.value)} placeholder="Due date (optional)" />
-            <div style={{ display:'flex', alignItems:'center', gap:8 }}>
-              <i className="ti ti-bell" style={{ color:'var(--amber)', fontSize:16, flexShrink:0 }} />
-              <input className="input" type="datetime-local" value={editReminder} onChange={e=>setEditReminder(e.target.value)} style={{ flex:1 }} placeholder="Reminder (optional)" />
+            <div style={{ display:'flex', alignItems:'center', gap:8, position:'relative' }}>
+              <button onClick={()=>setEditReminderMenu(!editReminderMenu)} style={{ width:36, height:36, borderRadius:'50%', border:'1.5px solid', borderColor:editReminder?'var(--amber)':'var(--border)', background:editReminder?'var(--amber-soft)':'transparent', cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', color:editReminder?'var(--amber)':'var(--muted)', fontSize:18, fontFamily:'inherit' }} title="Set reminder">
+                <i className={`ti ${editReminder?'ti-bell-filled':'ti-bell'}`} style={{ fontSize:18 }} />
+              </button>
+              <span style={{ fontSize:12, color:'var(--muted)', flex:1 }}>{editReminder?'Reminder set':'Set reminder'}</span>
+              {editReminderMenu && (
+                <div style={{ position:'absolute', top:40, left:0, background:'var(--surface)', border:'1px solid var(--border)', borderRadius:'var(--r)', boxShadow:'0 4px 12px rgba(0,0,0,0.15)', zIndex:10, minWidth:140 }}>
+                  {[{ label:'5 min', mins:5 }, { label:'15 min', mins:15 }, { label:'30 min', mins:30 }, { label:'1 hour', mins:60 }].map(opt => (
+                    <button key={opt.mins} onClick={() => { setEditReminder(new Date(Date.now()+opt.mins*60000).toISOString().slice(0,16)); setEditReminderMenu(false) }} style={{ display:'block', width:'100%', padding:'10px 14px', background:'none', border:'none', cursor:'pointer', textAlign:'left', fontSize:13, color:'var(--text)', borderBottom:'1px solid var(--border)', fontFamily:'inherit' }}>
+                      {opt.label}
+                    </button>
+                  ))}
+                  <button onClick={() => { setEditReminder(''); setEditReminderMenu(false) }} style={{ display:'block', width:'100%', padding:'10px 14px', background:'none', border:'none', cursor:'pointer', textAlign:'left', fontSize:13, color:'var(--red)', fontFamily:'inherit' }}>
+                    Clear
+                  </button>
+                </div>
+              )}
             </div>
           </>
         )}
@@ -165,6 +180,7 @@ function ImageTasksEditor({ imgAnalysis, imgDataUrl, onSave, onBack }) {
   const [tasks,    setTasks]    = useState(imgAnalysis.tasks?.length>0?imgAnalysis.tasks:[imgAnalysis.title])
   const [due,      setDue]      = useState(imgAnalysis.date?new Date(imgAnalysis.date).toISOString().slice(0,16):'')
   const [reminder, setReminder] = useState('')
+  const [reminderMenu, setReminderMenu] = useState(false)
   const [priority, setPriority] = useState('')
   const [saving,   setSaving]   = useState(false)
   const update = (i,val) => setTasks(prev=>prev.map((t,j)=>j===i?val:t))
@@ -193,9 +209,23 @@ function ImageTasksEditor({ imgAnalysis, imgDataUrl, onSave, onBack }) {
         ))}
       </div>
       <input className="input" type="datetime-local" value={due} onChange={e=>setDue(e.target.value)} style={{ marginBottom:8 }} placeholder="Due date (optional)" />
-      <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:14 }}>
-        <i className="ti ti-bell" style={{ color:'var(--amber)', fontSize:16, flexShrink:0 }} />
-        <input className="input" type="datetime-local" value={reminder} onChange={e=>setReminder(e.target.value)} style={{ flex:1 }} placeholder="Reminder (optional)" />
+      <div style={{ display:'flex', alignItems:'center', gap:8, position:'relative', marginBottom:14 }}>
+        <button onClick={()=>setReminderMenu(!reminderMenu)} style={{ width:36, height:36, borderRadius:'50%', border:'1.5px solid', borderColor:reminder?'var(--amber)':'var(--border)', background:reminder?'var(--amber-soft)':'transparent', cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', color:reminder?'var(--amber)':'var(--muted)', fontSize:18, fontFamily:'inherit', flexShrink:0 }} title="Set reminder">
+          <i className={`ti ${reminder?'ti-bell-filled':'ti-bell'}`} style={{ fontSize:18 }} />
+        </button>
+        <span style={{ fontSize:12, color:'var(--muted)', flex:1 }}>{reminder?'Reminder set':'Set reminder'}</span>
+        {reminderMenu && (
+          <div style={{ position:'absolute', top:40, left:0, background:'var(--surface)', border:'1px solid var(--border)', borderRadius:'var(--r)', boxShadow:'0 4px 12px rgba(0,0,0,0.15)', zIndex:10, minWidth:140 }}>
+            {[{ label:'5 min', mins:5 }, { label:'15 min', mins:15 }, { label:'30 min', mins:30 }, { label:'1 hour', mins:60 }].map(opt => (
+              <button key={opt.mins} onClick={() => { setReminder(new Date(Date.now()+opt.mins*60000).toISOString().slice(0,16)); setReminderMenu(false) }} style={{ display:'block', width:'100%', padding:'10px 14px', background:'none', border:'none', cursor:'pointer', textAlign:'left', fontSize:13, color:'var(--text)', borderBottom:'1px solid var(--border)', fontFamily:'inherit' }}>
+                {opt.label}
+              </button>
+            ))}
+            <button onClick={() => { setReminder(''); setReminderMenu(false) }} style={{ display:'block', width:'100%', padding:'10px 14px', background:'none', border:'none', cursor:'pointer', textAlign:'left', fontSize:13, color:'var(--red)', fontFamily:'inherit' }}>
+              Clear
+            </button>
+          </div>
+        )}
       </div>
       <div style={{ display:'flex', gap:8 }}>
         <button className="btn btn-primary" style={{ flex:1 }} onClick={async()=>{setSaving(true);await onSave(validTasks,due,reminder,priority)}} disabled={saving||validTasks.length===0}>
