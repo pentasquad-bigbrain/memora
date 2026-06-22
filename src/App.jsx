@@ -43,6 +43,21 @@ export default function App() {
     }
   }, [user])
 
+  useEffect(() => {
+    if (user) {
+      const timer = setTimeout(() => {
+        const splash = document.getElementById('splash-screen')
+        if (splash) {
+          splash.classList.add('fade-out')
+          setTimeout(() => {
+            splash.style.display = 'none'
+          }, 500)
+        }
+      }, 800)
+      return () => clearTimeout(timer)
+    }
+  }, [user])
+
   if (!user) return <Auth />
 
   return (

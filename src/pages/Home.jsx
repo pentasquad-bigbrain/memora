@@ -223,6 +223,26 @@ export default function Home() {
         </div>
       </div>
 
+      {/* Memora Logo */}
+      <div style={{ display:'flex', justifyContent:'center', padding:'8px 0' }}>
+        <svg width="48" height="48" viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg" style={{ opacity:0.85 }}>
+          <defs>
+            <linearGradient id="grad1" x1="0%" y1="0%" x2="100%" y2="100%">
+              <stop offset="0%" style={{ stopColor:'var(--accent)',stopOpacity:1 }} />
+              <stop offset="100%" style={{ stopColor:'#a855f7',stopOpacity:1 }} />
+            </linearGradient>
+            <linearGradient id="grad2" x1="100%" y1="0%" x2="0%" y2="100%">
+              <stop offset="0%" style={{ stopColor:'#06b6d4',stopOpacity:1 }} />
+              <stop offset="100%" style={{ stopColor:'#14b8a6',stopOpacity:1 }} />
+            </linearGradient>
+          </defs>
+          <path d="M50 80 Q50 50 80 50 L80 150 Q50 150 50 120 Z" fill="url(#grad1)" />
+          <path d="M120 80 Q150 50 150 80 L150 150 Q120 150 120 120 Z" fill="url(#grad2)" />
+          <path d="M70 85 Q100 70 130 85" stroke="url(#grad1)" strokeWidth="8" fill="none" strokeLinecap="round" />
+          <circle cx="100" cy="110" r="6" fill="#fbbf24" />
+        </svg>
+      </div>
+
       {/* Greeting */}
       <div style={{ padding:'14px 16px 0' }}>
         <div style={{ fontSize:28, fontWeight:700, lineHeight:1.2 }}>

@@ -3,14 +3,69 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-    <meta name="theme-color" content="#3B82F6" />
+    <meta name="theme-color" content="#1E293B" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="default" />
     <title>Memora</title>
+    <link rel="icon" type="image/svg+xml" href="/memora-logo.svg" />
+    <link rel="apple-touch-icon" href="/memora-logo-192.png" />
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3.x/dist/tabler-icons.min.css" />
+    <style>
+      body {
+        margin: 0;
+        padding: 0;
+        background: #0f172a;
+      }
+      .memora-splash {
+        position: fixed;
+        inset: 0;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        background: #0f172a;
+        z-index: 9999;
+        opacity: 1;
+        transition: opacity 0.5s ease-out;
+      }
+      .memora-splash.fade-out {
+        opacity: 0;
+        pointer-events: none;
+      }
+      .memora-splash-logo {
+        width: 120px;
+        height: 120px;
+        margin-bottom: 24px;
+      }
+      .memora-splash-text {
+        font-size: 18px;
+        color: #e2e8f0;
+        font-weight: 600;
+        letter-spacing: 1px;
+      }
+    </style>
   </head>
   <body>
     <div id="root"></div>
+    <div class="memora-splash" id="splash-screen">
+      <svg class="memora-splash-logo" viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">
+        <defs>
+          <linearGradient id="grad1" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" style="stop-color:#3b82f6;stop-opacity:1" />
+            <stop offset="100%" style="stop-color:#a855f7;stop-opacity:1" />
+          </linearGradient>
+          <linearGradient id="grad2" x1="100%" y1="0%" x2="0%" y2="100%">
+            <stop offset="0%" style="stop-color:#06b6d4;stop-opacity:1" />
+            <stop offset="100%" style="stop-color:#14b8a6;stop-opacity:1" />
+          </linearGradient>
+        </defs>
+        <path d="M50 80 Q50 50 80 50 L80 150 Q50 150 50 120 Z" fill="url(#grad1)" />
+        <path d="M120 80 Q150 50 150 80 L150 150 Q120 150 120 120 Z" fill="url(#grad2)" />
+        <path d="M70 85 Q100 70 130 85" stroke="url(#grad1)" stroke-width="8" fill="none" stroke-linecap="round" />
+        <circle cx="100" cy="100" r="6" fill="#fbbf24" />
+      </svg>
+      <div class="memora-splash-text">Memora</div>
+    </div>
     <script type="module" src="/src/main.jsx"></script>
   </body>
 </html>
