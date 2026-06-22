@@ -659,10 +659,10 @@ export default function Tasks() {
                     <CircularProgress progress={task.progress||0} done={isDone} color={task.priority&&PRIORITY_META[task.priority]?PRIORITY_META[task.priority].color:overdue?'var(--red)':'var(--accent)'} onClick={e=>handleToggleDone(e,task)} />
                   </div>
                   <div style={{ flex:1, minWidth:0 }}>
-                    <div style={{ display:'flex', alignItems:'center', gap:6, flexWrap:'wrap' }}>
+                    <div style={{ display:'flex', alignItems:'center', gap:8, flexWrap:'wrap' }}>
                       <div style={{ fontSize:14, fontWeight:500, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap', textDecoration:isDone?'line-through':'none', color:isDone?'var(--muted)':'var(--text)', flex:1, minWidth:0 }}>{task.title}</div>
                       {task.priority && PRIORITY_META[task.priority] && (
-                        <span style={{ fontSize:9, fontWeight:700, background:PRIORITY_META[task.priority].bg, color:PRIORITY_META[task.priority].color, padding:'1px 7px', borderRadius:10, flexShrink:0, whiteSpace:'nowrap' }}>{PRIORITY_META[task.priority].label}</span>
+                        <span style={{ fontSize:11, fontWeight:700, background:PRIORITY_META[task.priority].bg, color:PRIORITY_META[task.priority].color, padding:'3px 10px', borderRadius:12, flexShrink:0, whiteSpace:'nowrap', display:'flex', alignItems:'center' }}>{PRIORITY_META[task.priority].label}</span>
                       )}
                     </div>
                     {due && <div style={{ fontSize:11, color:due.red?'var(--red)':'var(--muted)', marginTop:2, fontWeight:due.red?600:400 }}>{due.text}</div>}

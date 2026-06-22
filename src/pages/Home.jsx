@@ -383,7 +383,7 @@ export default function Home() {
               <div style={{ display:'flex', alignItems:'center', gap:10, marginBottom:6 }}>
                 <div style={{ fontSize:13, fontWeight:500, flex:1 }}>{task.title}</div>
                 {task.priority && PRIORITY_META[task.priority] && (
-                  <span style={{ fontSize:8, fontWeight:700, background:PRIORITY_META[task.priority].bg, color:PRIORITY_META[task.priority].color, padding:'1px 6px', borderRadius:10, whiteSpace:'nowrap' }}>{PRIORITY_META[task.priority].label}</span>
+                  <span style={{ fontSize:11, fontWeight:700, background:PRIORITY_META[task.priority].bg, color:PRIORITY_META[task.priority].color, padding:'3px 10px', borderRadius:12, whiteSpace:'nowrap', display:'flex', alignItems:'center' }}>{PRIORITY_META[task.priority].label}</span>
                 )}
               </div>
               {task.due_at && <div style={{ fontSize:10, color:overdue?'var(--red)':'var(--muted)', marginBottom:6, fontWeight:overdue?600:400 }}>{format(new Date(task.due_at),'h:mm a')}</div>}
