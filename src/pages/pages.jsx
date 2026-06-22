@@ -5,6 +5,23 @@ import { formatDistanceToNow, format, isToday, isYesterday } from 'date-fns'
 import Tesseract from 'tesseract.js'
 import { SkeletonVaultCard } from '../components/shared/Skeleton'
 
+// Import from Tasks.jsx
+export const PRIORITY_META = {
+  low:  { color:'var(--green)',  bg:'var(--green-soft)',  label:'Low' },
+  med:  { color:'var(--amber)',  bg:'var(--amber-soft)',  label:'Medium' },
+  high: { color:'var(--red)',    bg:'var(--red-soft)',    label:'High' },
+}
+
+// Schedule reminder notification
+function scheduleReminder(title, reminderAt) {
+  if (!reminderAt || !('Notification' in window)) return
+  const delay = new Date(reminderAt) - Date.now()
+  if (delay <= 0) return
+  const go = () => new Notification('⏰ Memora Reminder', { body: title, icon: '/memora/icon-192.png' })
+  if (Notification.permission === 'granted') { setTimeout(go, Math.min(delay, 2147483647)); return }
+  Notification.requestPermission().then(p => { if (p === 'granted') setTimeout(go, Math.min(delay, 2147483647)) })
+}
+
 // ── Shared helpers ────────────────────────────────────────────
 const AVATAR_COLORS = ['avatar-blue', 'avatar-green', 'avatar-purple', 'avatar-amber', 'avatar-red']
 function initials(name) { return name?.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2) || '?' }
