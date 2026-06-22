@@ -114,18 +114,19 @@ function SlideToComplete({ onComplete, label='Slide to complete', accentColor='v
 
 // ── Redesigned QuickAdd ───────────────────────────────────────
 function QuickAdd({ onAdd, onFindPerson }) {
-  const [open,      setOpen]      = useState(false)
-  const [title,     setTitle]     = useState('')
-  const [dueDate,   setDueDate]   = useState(null)
-  const [customDate,setCustomDate]= useState('')
-  const [allDay,    setAllDay]    = useState(true)
-  const [time,      setTime]      = useState('')
-  const [priority,  setPriority]  = useState('')
-  const [reminder,  setReminder]  = useState('')
-  const [parsing,   setParsing]   = useState(false)
-  const [saving,    setSaving]    = useState(false)
-  const [parsed,    setParsed]    = useState(null)
-  const [listening, setListening] = useState(false)
+  const [open,       setOpen]       = useState(false)
+  const [title,      setTitle]      = useState('')
+  const [dueDate,    setDueDate]    = useState(null)
+  const [customDate, setCustomDate] = useState('')
+  const [allDay,     setAllDay]     = useState(true)
+  const [time,       setTime]       = useState('')
+  const [priority,   setPriority]   = useState('')
+  const [reminder,   setReminder]   = useState('')
+  const [reminderMenu, setReminderMenu] = useState(false)
+  const [parsing,    setParsing]    = useState(false)
+  const [saving,     setSaving]     = useState(false)
+  const [parsed,     setParsed]     = useState(null)
+  const [listening,  setListening]  = useState(false)
   const recognitionRef = useRef(null)
   const inputRef = useRef(null)
   const hasVoiceSupport = typeof window!=='undefined'&&!!(window.SpeechRecognition||window.webkitSpeechRecognition)
@@ -296,12 +297,29 @@ function QuickAdd({ onAdd, onFindPerson }) {
             </div>
           </div>
 
-          {/* Reminder — bell button only */}
-          <div style={{ padding:'0 16px 12px', display:'flex', alignItems:'center', gap:8 }}>
-            <button onClick={()=>setReminder(reminder?'':new Date(Date.now()+15*60000).toISOString().slice(0,16))} style={{ width:36, height:36, borderRadius:'50%', border:'1.5px solid', borderColor:reminder?'var(--amber)':'var(--border)', background:reminder?'var(--amber-soft)':'transparent', cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', color:reminder?'var(--amber)':'var(--muted)', fontSize:18 }} title="Set reminder (15 min from now)">
+          {/* Reminder — bell button with quick menu */}
+          <div style={{ padding:'0 16px 12px', display:'flex', alignItems:'center', gap:8, position:'relative' }}>
+            <button onClick={()=>setReminderMenu(!reminderMenu)} style={{ width:36, height:36, borderRadius:'50%', border:'1.5px solid', borderColor:reminder?'var(--amber)':'var(--border)', background:reminder?'var(--amber-soft)':'transparent', cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', color:reminder?'var(--amber)':'var(--muted)', fontSize:18 }} title="Set reminder">
               <i className={`ti ${reminder?'ti-bell-filled':'ti-bell'}`} style={{ fontSize:18 }} />
             </button>
             <span style={{ fontSize:12, color:'var(--muted)' }}>{reminder?'Reminder set':'Set reminder'}</span>
+            {reminderMenu && (
+              <div style={{ position:'absolute', top:40, left:0, background:'var(--surface)', border:'1px solid var(--border)', borderRadius:'var(--r)', boxShadow:'0 4px 12px rgba(0,0,0,0.15)', zIndex:10, minWidth:140 }}>
+                {[
+                  { label:'5 min', mins:5 },
+                  { label:'15 min', mins:15 },
+                  { label:'30 min', mins:30 },
+                  { label:'1 hour', mins:60 },
+                ].map(opt => (
+                  <button key={opt.mins} onClick={() => { setReminder(new Date(Date.now()+opt.mins*60000).toISOString().slice(0,16)); setReminderMenu(false) }} style={{ display:'block', width:'100%', padding:'10px 14px', background:'none', border:'none', cursor:'pointer', textAlign:'left', fontSize:13, color:'var(--text)', borderBottom:'1px solid var(--border)', fontFamily:'inherit' }}>
+                    {opt.label}
+                  </button>
+                ))}
+                <button onClick={() => setReminder('')} style={{ display:'block', width:'100%', padding:'10px 14px', background:'none', border:'none', cursor:'pointer', textAlign:'left', fontSize:13, color:'var(--red)', fontFamily:'inherit' }}>
+                  Clear
+                </button>
+              </div>
+            )}
           </div>
 
           {/* Actions */}
@@ -330,15 +348,16 @@ function TaskModal({ taskId, onClose, onUpdate, onDelete }) {
   const people = useStore(s=>s.people)
   const task = tasks.find(t=>t.id===taskId)
 
-  const [editTitle,    setEditTitle]    = useState(task?.title||'')
-  const [editNotes,    setEditNotes]    = useState(task?.notes||'')
-  const [editDue,      setEditDue]      = useState(task?.due_at?new Date(task.due_at).toISOString().slice(0,16):'')
-  const [editPriority, setEditPriority] = useState(task?.priority||'')
-  const [editReminder, setEditReminder] = useState(task?.reminder_at?new Date(task.reminder_at).toISOString().slice(0,16):'')
-  const [editProgress, setEditProgress] = useState(task?.progress||0)
-  const [editPersonId, setEditPersonId] = useState(task?.person_id||'')
-  const [saving,       setSaving]       = useState(false)
-  const [delConfirm,   setDelConfirm]   = useState(false)
+  const [editTitle,      setEditTitle]      = useState(task?.title||'')
+  const [editNotes,      setEditNotes]      = useState(task?.notes||'')
+  const [editDue,        setEditDue]        = useState(task?.due_at?new Date(task.due_at).toISOString().slice(0,16):'')
+  const [editPriority,   setEditPriority]   = useState(task?.priority||'')
+  const [editReminder,   setEditReminder]   = useState(task?.reminder_at?new Date(task.reminder_at).toISOString().slice(0,16):'')
+  const [editReminderMenu, setEditReminderMenu] = useState(false)
+  const [editProgress,   setEditProgress]   = useState(task?.progress||0)
+  const [editPersonId,   setEditPersonId]   = useState(task?.person_id||'')
+  const [saving,         setSaving]         = useState(false)
+  const [delConfirm,     setDelConfirm]     = useState(false)
 
   if (!task) return null
 
@@ -382,11 +401,28 @@ function TaskModal({ taskId, onClose, onUpdate, onDelete }) {
               ))}
             </div>
           </div>
-          <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:12 }}>
-            <button onClick={()=>setEditReminder(editReminder?'':new Date(Date.now()+15*60000).toISOString().slice(0,16))} style={{ width:36, height:36, borderRadius:'50%', border:'1.5px solid', borderColor:editReminder?'var(--amber)':'var(--border)', background:editReminder?'var(--amber-soft)':'transparent', cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', color:editReminder?'var(--amber)':'var(--muted)', fontSize:18, flexShrink:0 }} title="Set reminder (15 min from now)">
+          <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:12, position:'relative' }}>
+            <button onClick={()=>setEditReminderMenu(!editReminderMenu)} style={{ width:36, height:36, borderRadius:'50%', border:'1.5px solid', borderColor:editReminder?'var(--amber)':'var(--border)', background:editReminder?'var(--amber-soft)':'transparent', cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', color:editReminder?'var(--amber)':'var(--muted)', fontSize:18, flexShrink:0 }} title="Set reminder">
               <i className={`ti ${editReminder?'ti-bell-filled':'ti-bell'}`} style={{ fontSize:18 }} />
             </button>
             <span style={{ fontSize:12, color:'var(--muted)' }}>{editReminder?'Reminder set':'Set reminder'}</span>
+            {editReminderMenu && (
+              <div style={{ position:'absolute', top:40, left:0, background:'var(--surface)', border:'1px solid var(--border)', borderRadius:'var(--r)', boxShadow:'0 4px 12px rgba(0,0,0,0.15)', zIndex:10, minWidth:140 }}>
+                {[
+                  { label:'5 min', mins:5 },
+                  { label:'15 min', mins:15 },
+                  { label:'30 min', mins:30 },
+                  { label:'1 hour', mins:60 },
+                ].map(opt => (
+                  <button key={opt.mins} onClick={() => { setEditReminder(new Date(Date.now()+opt.mins*60000).toISOString().slice(0,16)); setEditReminderMenu(false) }} style={{ display:'block', width:'100%', padding:'10px 14px', background:'none', border:'none', cursor:'pointer', textAlign:'left', fontSize:13, color:'var(--text)', borderBottom:'1px solid var(--border)', fontFamily:'inherit' }}>
+                    {opt.label}
+                  </button>
+                ))}
+                <button onClick={() => setEditReminder('')} style={{ display:'block', width:'100%', padding:'10px 14px', background:'none', border:'none', cursor:'pointer', textAlign:'left', fontSize:13, color:'var(--red)', fontFamily:'inherit' }}>
+                  Clear
+                </button>
+              </div>
+            )}
           </div>
           {people.length>0 && (
             <select className="input" value={editPersonId} onChange={e=>setEditPersonId(e.target.value)} style={{ marginBottom:12 }}>
