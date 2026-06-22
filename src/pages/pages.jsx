@@ -574,6 +574,8 @@ export function Vault() {
   const [multiSelect, setMultiSelect]   = useState(false)
   const [selectedIds, setSelectedIds]   = useState(new Set())
   const [cardMenu, setCardMenu]         = useState(null)
+  const [showFilter, setShowFilter]     = useState(false)
+  const [filterDays, setFilterDays]     = useState(null)
   const longPressTimer = useRef(null)
   const [toast, showToast] = useToast()
 
@@ -585,6 +587,11 @@ export function Vault() {
     }
     if (cat !== 'all' && v.type !== cat) return false
     if (search && !v.title?.toLowerCase().includes(search.toLowerCase()) && !v.ocr_text?.toLowerCase().includes(search.toLowerCase())) return false
+    if (filterDays !== null) {
+      const itemDate = new Date(v.created_at)
+      const cutoff = new Date(Date.now() - filterDays * 86400000)
+      if (itemDate < cutoff) return false
+    }
     return true
   })
 
@@ -671,10 +678,24 @@ export function Vault() {
               {c === 'review' ? '📋 Review' : c}
             </button>
           ))}
-          <div style={{ marginLeft: 'auto', display: 'flex', gap: 6 }}>
-            <button onClick={() => {}} style={{ background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: 'var(--r-sm)', padding: '6px 10px', cursor: 'pointer', fontSize: 12, color: 'var(--muted)', fontFamily: 'inherit', display: 'flex', alignItems: 'center', gap: 4 }}>
+          <div style={{ marginLeft: 'auto', display: 'flex', gap: 6, position: 'relative' }}>
+            <button onClick={() => setShowFilter(!showFilter)} style={{ background: showFilter ? 'var(--accent-soft)' : 'var(--bg)', border: '1px solid var(--border)', borderRadius: 'var(--r-sm)', padding: '6px 10px', cursor: 'pointer', fontSize: 12, color: showFilter ? 'var(--accent)' : 'var(--muted)', fontFamily: 'inherit', display: 'flex', alignItems: 'center', gap: 4 }}>
               <i className="ti ti-filter" style={{ fontSize: 13 }} /> Filter
             </button>
+            {showFilter && (
+              <div style={{ position: 'absolute', top: 32, right: 0, background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--r-sm)', boxShadow: '0 4px 12px rgba(0,0,0,0.15)', zIndex: 10, minWidth: 160, padding: 0 }}>
+                {[
+                  { label: 'All time', days: null },
+                  { label: 'Last 7 days', days: 7 },
+                  { label: 'Last 30 days', days: 30 },
+                  { label: 'Last 90 days', days: 90 },
+                ].map(opt => (
+                  <button key={opt.days} onClick={() => { setFilterDays(opt.days); setShowFilter(false) }} style={{ display: 'block', width: '100%', padding: '10px 14px', background: filterDays === opt.days ? 'var(--accent-soft)' : 'none', border: 'none', cursor: 'pointer', textAlign: 'left', fontSize: 13, color: filterDays === opt.days ? 'var(--accent)' : 'var(--text)', borderBottom: '1px solid var(--border)', fontFamily: 'inherit' }}>
+                    {opt.label}
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
         </div>
       </div>
@@ -1671,6 +1692,59 @@ function BrainstormPanel({ ideas, tasks, onSaveTask, onClose }) {
   )
 }
 
+function AttachVaultModal({ vaultItems, onAttach, onClose }) {
+  const [selected, setSelected] = useState(new Set())
+  const [typeFilter, setTypeFilter] = useState('all')
+  const filtered = vaultItems.filter(v => typeFilter === 'all' || v.type === typeFilter)
+  const toggle = (id) => { setSelected(s => { const n = new Set(s); n.has(id) ? n.delete(id) : n.add(id); return n }) }
+  const handleAdd = () => {
+    const items = vaultItems.filter(v => selected.has(v.id))
+    onAttach(items)
+    onClose()
+  }
+  return (
+    <div style={{ position: 'fixed', inset: 0, zIndex: 300, display: 'flex', flexDirection: 'column', justifyContent: 'flex-end', background: 'rgba(0,0,0,0.45)' }} onClick={onClose}>
+      <div style={{ background: 'var(--surface)', borderRadius: '20px 20px 0 0', maxHeight: '75dvh', overflowY: 'auto', maxWidth: 430, margin: '0 auto', width: '100%' }} onClick={e => e.stopPropagation()}>
+        <div style={{ padding: '16px 20px calc(20px + env(safe-area-inset-bottom))' }}>
+          <div style={{ width: 36, height: 4, background: 'var(--border)', borderRadius: 2, margin: '0 auto 16px' }} />
+          <div style={{ fontSize: 18, fontWeight: 600, marginBottom: 12 }}>Attach vault items</div>
+          <div style={{ display: 'flex', gap: 6, marginBottom: 14, overflowX: 'auto' }}>
+            {['all', 'note', 'image', 'screenshot', 'document'].map(t => (
+              <button key={t} onClick={() => setTypeFilter(t)} style={{ padding: '5px 12px', borderRadius: 20, fontSize: 12, fontWeight: 500, border: '1.5px solid', cursor: 'pointer', fontFamily: 'inherit', background: typeFilter === t ? 'var(--accent)' : 'transparent', color: typeFilter === t ? '#fff' : 'var(--muted)', borderColor: typeFilter === t ? 'var(--accent)' : 'var(--border)', textTransform: 'capitalize', flexShrink: 0 }}>
+                {t === 'all' ? 'All' : t}
+              </button>
+            ))}
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8, maxHeight: 300, overflowY: 'auto', marginBottom: 12 }}>
+            {filtered.length === 0 ? (
+              <div style={{ textAlign: 'center', padding: '20px', color: 'var(--muted)', fontSize: 12 }}>No items found</div>
+            ) : (
+              filtered.map(v => {
+                const vm = VAULT_META[v.type] || VAULT_META.note
+                return (
+                  <label key={v.id} onClick={() => toggle(v.id)} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px', borderRadius: 'var(--r-sm)', border: `1px solid ${selected.has(v.id) ? 'var(--accent)' : 'var(--border)'}`, background: selected.has(v.id) ? 'var(--accent-soft)' : 'var(--bg)', cursor: 'pointer' }}>
+                    <input type="checkbox" checked={selected.has(v.id)} onChange={() => toggle(v.id)} style={{ accentColor: 'var(--accent)', width: 16, height: 16, flexShrink: 0 }} />
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontSize: 13, fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{v.title || 'Untitled'}</div>
+                      <div style={{ fontSize: 10, color: 'var(--muted)', marginTop: 2, textTransform: 'capitalize' }}>{v.type}</div>
+                    </div>
+                  </label>
+                )
+              })
+            )}
+          </div>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <button className="btn btn-primary" style={{ flex: 1 }} onClick={handleAdd} disabled={selected.size === 0}>
+              Add {selected.size > 0 ? `(${selected.size})` : ''}
+            </button>
+            <button className="btn btn-ghost" onClick={onClose}>Cancel</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 const STATUS_META = {
   raw:         { label:'New',         color:'var(--green)',  bg:'var(--green-soft)' },
   in_progress: { label:'In progress', color:'var(--accent)', bg:'var(--accent-soft)' },
@@ -1688,6 +1762,7 @@ export function IdeaLab() {
   const [showBrainstorm, setShowBrainstorm] = useState(false)
   const [showSearch, setShowSearch] = useState(false)
   const [search,     setSearch]     = useState('')
+  const [showAttach, setShowAttach] = useState(false)
   const [ideaTaskInput, setIdeaTaskInput] = useState('')
   const [ideaTaskSaving, setIdeaTaskSaving] = useState(false)
   const [toast, showToast] = useToast()
@@ -1728,6 +1803,14 @@ export function IdeaLab() {
     setIdeaTaskInput('')
     setIdeaTaskSaving(false)
     showToast('Task added')
+  }
+
+  const handleAttachItems = (items) => {
+    if (!selected) return
+    setSelected(s => ({
+      ...s,
+      _attachments: [...(s._attachments || []), ...items]
+    }))
   }
 
   const ideaTasks = selected ? tasks.filter(t => t.notes?.includes(`[idea:${selected.id}]`)) : []
@@ -1804,7 +1887,7 @@ export function IdeaLab() {
           {/* Attachments section */}
           {(selected._activeIdeaTab || 'tasks') === 'attachments' && (
             <div style={{ marginBottom: 16 }}>
-              <button onClick={() => {}} className="btn btn-primary" style={{ width: '100%', marginBottom: 10, gap: 6 }}>
+              <button onClick={() => setShowAttach(true)} className="btn btn-primary" style={{ width: '100%', marginBottom: 10, gap: 6 }}>
                 <i className="ti ti-plus" style={{ fontSize: 14 }} /> Attach vault items
               </button>
               {selected._attachments?.length > 0 ? (
@@ -1988,6 +2071,7 @@ export function IdeaLab() {
 
       {showNew && <NewIdeaModal tasks={tasks} vaultItems={vaultItems} onClose={() => setShowNew(false)} onSave={handleNewIdea} />}
       {showBrainstorm && <BrainstormPanel ideas={ideas} tasks={tasks} onSaveTask={handleSaveTask} onClose={() => setShowBrainstorm(false)} />}
+      {showAttach && selected && <AttachVaultModal vaultItems={vaultItems} onAttach={handleAttachItems} onClose={() => setShowAttach(false)} />}
       {toast && <div className="toast">{toast}</div>}
     </div>
   )
