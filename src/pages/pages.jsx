@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useMemo } from 'react'
 import { useStore } from '../lib/store'
 import { expandIdea, generateJournalSummary, brainstormIdeas, analyzeImage } from '../lib/groq'
 import { formatDistanceToNow, format, isToday, isYesterday } from 'date-fns'
@@ -1770,6 +1770,16 @@ export function IdeaLab() {
   const [ideaTaskSaving, setIdeaTaskSaving] = useState(false)
   const [toast, showToast] = useToast()
 
+  useEffect(() => {
+    if (selected) {
+      // Reset input states when idea is selected
+      setIdeaTaskInput('')
+      setIdeaTaskPriority('')
+      setIdeaTaskReminder('')
+      setIdeaTaskReminderMenu(false)
+    }
+  }, [selected?.id])
+
   const handleExpand = async (idea) => {
     setLoading(true); setExpansion(null)
     try { const r = await expandIdea(idea); setExpansion(r) }
@@ -1816,15 +1826,21 @@ export function IdeaLab() {
     }))
   }
 
-  const ideaTasks = selected ? tasks.filter(t => t.notes?.includes(`[idea:${selected.id}]`)) : []
+  const ideaTasks = useMemo(() =>
+    selected ? tasks.filter(t => t.notes?.includes(`[idea:${selected.id}]`)) : [],
+    [selected?.id, tasks]
+  )
 
-  const filteredIdeas = ideas.filter(i => {
-    if (search) return i.title.toLowerCase().includes(search.toLowerCase()) || i.body?.toLowerCase().includes(search.toLowerCase())
-    if (activeTab === 'recent')      return i.status === 'raw' || !i.status
-    if (activeTab === 'in_progress') return i.status === 'in_progress'
-    if (activeTab === 'completed')   return i.status === 'done'
-    return true
-  })
+  const filteredIdeas = useMemo(() =>
+    ideas.filter(i => {
+      if (search) return i.title.toLowerCase().includes(search.toLowerCase()) || i.body?.toLowerCase().includes(search.toLowerCase())
+      if (activeTab === 'recent')      return i.status === 'raw' || !i.status
+      if (activeTab === 'in_progress') return i.status === 'in_progress'
+      if (activeTab === 'completed')   return i.status === 'done'
+      return true
+    }),
+    [ideas, search, activeTab]
+  )
 
   if (selected) {
     return (
