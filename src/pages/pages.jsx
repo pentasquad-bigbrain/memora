@@ -203,6 +203,7 @@ const VAULT_TYPES = ['image','note','receipt','document','screenshot']
 
 // Vault item detail modal — with edit mode
 function VaultItemModal({ item, onClose, onDelete, onUpdate }) {
+  const [viewingImage, setViewingImage] = useState(false)
   const [confirming, setConfirming] = useState(false)
   const [editing,    setEditing]    = useState(false)
   const [saving,     setSaving]     = useState(false)
@@ -241,7 +242,9 @@ function VaultItemModal({ item, onClose, onDelete, onUpdate }) {
       <div style={{ background: 'var(--surface)', borderRadius: '20px 20px 0 0', maxHeight: '85dvh', overflowY: 'auto', maxWidth: 430, margin: '0 auto', width: '100%' }} onClick={e => e.stopPropagation()}>
         {/* Image preview */}
         {item.file_url && (
-          <img src={item.file_url} alt={item.title} style={{ width: '100%', maxHeight: 260, objectFit: 'cover', borderRadius: '20px 20px 0 0' }} />
+          <button onClick={() => setViewingImage(true)} style={{ display: 'block', width: '100%', padding: 0, border: 0, background: 'none', cursor: 'zoom-in' }} title="View full image">
+            <img src={item.file_url} alt={item.title} style={{ display: 'block', width: '100%', maxHeight: 260, objectFit: 'cover', borderRadius: '20px 20px 0 0' }} />
+          </button>
         )}
         {!item.file_url && (
           <div style={{ height: 100, background: meta.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: '20px 20px 0 0' }}>
@@ -310,6 +313,14 @@ function VaultItemModal({ item, onClose, onDelete, onUpdate }) {
           )}
         </div>
       </div>
+      {viewingImage && (
+        <div onClick={() => setViewingImage(false)} style={{ position: 'fixed', inset: 0, zIndex: 400, background: 'rgba(0,0,0,0.94)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 12 }}>
+          <img src={item.file_url} alt={item.title} style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' }} />
+          <button onClick={() => setViewingImage(false)} title="Close image" style={{ position: 'absolute', top: 'max(14px, env(safe-area-inset-top))', right: 14, width: 40, height: 40, borderRadius: '50%', border: 0, background: 'rgba(255,255,255,0.18)', color: '#fff', cursor: 'pointer' }}>
+            <i className="ti ti-x" style={{ fontSize: 22 }} />
+          </button>
+        </div>
+      )}
     </div>
   )
 }
@@ -694,6 +705,13 @@ export function Vault() {
     else showToast('Delete failed')
   }
 
+  const openReceipt = (expense) => {
+    const linked = vaultItems.find(v => v.id === expense.vault_item_id)
+      || vaultItems.find(v => v.type === 'receipt' && v.title === expense.vendor && v.created_at?.slice(0, 10) === expense.date)
+    if (linked) setSelected(linked)
+    else showToast('No image attached to this receipt')
+  }
+
   const handleUpdate = async (id, updates) => {
     try {
       const { error } = await updateVaultItem(id, updates)
@@ -839,7 +857,7 @@ export function Vault() {
             {monthReceipts.length > 0 && (
               <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--r)', padding: '4px 14px', marginTop: 10 }}>
                 {monthReceipts.slice(0, 10).map((e, i) => (
-                  <div key={e.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 0', borderBottom: i < Math.min(monthReceipts.length, 10) - 1 ? '1px solid var(--border)' : 'none' }}>
+                  <div key={e.id} onClick={() => openReceipt(e)} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 0', borderBottom: i < Math.min(monthReceipts.length, 10) - 1 ? '1px solid var(--border)' : 'none', cursor: 'pointer' }}>
                     <i className="ti ti-receipt" style={{ fontSize: 15, color: 'var(--amber)', flexShrink: 0 }} />
                     <div style={{ flex: 1 }}>
                       <div style={{ fontSize: 13, fontWeight: 500 }}>{e.vendor || 'Unknown'}</div>
@@ -847,7 +865,7 @@ export function Vault() {
                     </div>
                     <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text)' }}>₹{Math.round(e.amount).toLocaleString('en-IN')}</span>
                     <button
-                      onClick={() => handleDeleteExpense(e.id)}
+                      onClick={(event) => { event.stopPropagation(); handleDeleteExpense(e.id) }}
                       title="Delete receipt"
                       style={{ width: 28, height: 28, borderRadius: '50%', border: 'none', background: 'var(--red-soft)', color: 'var(--red)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}
                     >
@@ -1053,6 +1071,7 @@ export function Journal() {
   const [centerDate, setCenterDate] = useState(() => new Date())
   const [selectedDay, setSelectedDay] = useState(3)
   const [savedMode, setSavedMode] = useState(false)
+  const [draftHydrated, setDraftHydrated] = useState(false)
   const datePickerRef = useRef(null)
 
   const weekDays = Array.from({ length: 7 }, (_, i) => { const d = new Date(centerDate); d.setDate(centerDate.getDate() - 3 + i); return d })
@@ -1062,15 +1081,19 @@ export function Journal() {
   const isFutureDate = selectedDate > todayDate && selectedDate.toDateString() !== todayDate.toDateString()
 
   useEffect(() => {
+    let cancelled = false
+    setDraftHydrated(false)
     setLogEntries([]); setNewEntryText(''); setEditingId(null)
     setAiSummary(null); setJournalImages([]); setPromotedTasks({}); setSavedMode(false)
     fetchJournalEntry(dateStr).then(entry => {
+      if (cancelled) return
       if (!entry) {
         try {
           const draft = JSON.parse(localStorage.getItem(draftKey) || 'null')
           if (draft?.logEntries?.length) setLogEntries(draft.logEntries)
           if (draft?.journalImages?.length) setJournalImages(draft.journalImages)
         } catch {}
+        setDraftHydrated(true)
         return
       }
       const summary = entry.auto_summary || null
@@ -1093,17 +1116,19 @@ export function Journal() {
         setLogEntries([makeEntry(entry.personal_note)])
         setSavedMode(true)
       }
+      setDraftHydrated(true)
     })
+    return () => { cancelled = true }
   }, [dateStr])
 
   useEffect(() => {
-    if (savedMode) return
+    if (!draftHydrated || savedMode) return
     if (!logEntries.length && !journalImages.length) {
       localStorage.removeItem(draftKey)
       return
     }
     localStorage.setItem(draftKey, JSON.stringify({ logEntries, journalImages, updated_at: new Date().toISOString() }))
-  }, [draftKey, logEntries, journalImages, savedMode])
+  }, [draftKey, logEntries, journalImages, savedMode, draftHydrated])
 
   const isDate = (ts) => new Date(ts).toDateString() === selectedDate.toDateString()
   const dayDone     = tasks.filter(t => t.status === 'done' && t.updated_at && isDate(t.updated_at))
@@ -1880,7 +1905,7 @@ function AttachVaultModal({ vaultItems, onAttach, onClose }) {
               filtered.map(v => {
                 const vm = VAULT_META[v.type] || VAULT_META.note
                 return (
-                  <label key={v.id} onClick={() => toggle(v.id)} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px', borderRadius: 'var(--r-sm)', border: `1px solid ${selected.has(v.id) ? 'var(--accent)' : 'var(--border)'}`, background: selected.has(v.id) ? 'var(--accent-soft)' : 'var(--bg)', cursor: 'pointer' }}>
+                  <label key={v.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px', borderRadius: 'var(--r-sm)', border: `1px solid ${selected.has(v.id) ? 'var(--accent)' : 'var(--border)'}`, background: selected.has(v.id) ? 'var(--accent-soft)' : 'var(--bg)', cursor: 'pointer' }}>
                     <input type="checkbox" checked={selected.has(v.id)} onChange={() => toggle(v.id)} style={{ accentColor: 'var(--accent)', width: 16, height: 16, flexShrink: 0 }} />
                     <div style={{ flex: 1, minWidth: 0 }}>
                       <div style={{ fontSize: 13, fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{v.title || 'Untitled'}</div>
@@ -1910,7 +1935,7 @@ const STATUS_META = {
 }
 
 export function IdeaLab() {
-  const { ideas, tasks, vaultItems, addTask, addIdea, updateIdea, deleteIdea } = useStore()
+  const { ideas, tasks, vaultItems, addTask, addIdea, updateIdea, updateVaultItem, deleteIdea } = useStore()
   const [activeTab,  setActiveTab]  = useState('recent')
   const [selected,   setSelected]   = useState(null)
   const [expansion,  setExpansion]  = useState(null)
@@ -1976,13 +2001,16 @@ export function IdeaLab() {
     showToast('Task added')
   }
 
-  const handleAttachItems = (items) => {
+  const handleAttachItems = async (items) => {
     if (!selected) return
-    setSelected(s => ({
-      ...s,
-      _attachments: [...(s._attachments || []), ...items]
-    }))
+    await Promise.all(items.map(item => updateVaultItem(item.id, { idea_id: selected.id })))
+    showToast(`${items.length} item${items.length === 1 ? '' : 's'} attached`)
   }
+
+  const ideaAttachments = useMemo(
+    () => selected ? vaultItems.filter(item => item.idea_id === selected.id) : [],
+    [selected?.id, vaultItems]
+  )
 
   const ideaTasks = useMemo(() =>
     selected ? tasks.filter(t => t.notes?.includes(`[idea:${selected.id}]`)) : [],
@@ -2187,9 +2215,9 @@ export function IdeaLab() {
               <button onClick={() => setShowAttach(true)} className="btn btn-primary" style={{ width: '100%', marginBottom: 10, gap: 6 }}>
                 <i className="ti ti-plus" style={{ fontSize: 14 }} /> Attach vault items
               </button>
-              {selected._attachments?.length > 0 ? (
+              {ideaAttachments.length > 0 ? (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                  {selected._attachments.map(att => {
+                  {ideaAttachments.map(att => {
                     const vm = VAULT_META[att.type] || VAULT_META.note
                     return (
                       <div key={att.id} style={{ display: 'flex', gap: 10, padding: '10px 12px', background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: 'var(--r-sm)', alignItems: 'flex-start' }}>
@@ -2199,7 +2227,7 @@ export function IdeaLab() {
                           <div style={{ fontSize: 11, color: 'var(--muted)', marginBottom: 4 }}>{vm.icon.replace('ti-', '').toUpperCase()}</div>
                           {att.ocr_text && <div style={{ fontSize: 11, color: 'var(--muted)', overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' }}>{att.ocr_text}</div>}
                         </div>
-                        <button onClick={() => setSelected(s => ({ ...s, _attachments: s._attachments?.filter(a => a.id !== att.id) || [] }))} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--hint)', padding: 2 }}>
+                        <button onClick={async () => { await updateVaultItem(att.id, { idea_id: null }); showToast('Attachment removed') }} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--hint)', padding: 2 }}>
                           <i className="ti ti-x" style={{ fontSize: 14 }} />
                         </button>
                       </div>

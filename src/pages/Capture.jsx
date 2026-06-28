@@ -465,7 +465,9 @@ export default function Capture() {
   const handleImageSaveExpense = async () => {
     if (!imgAnalysis?.amount||imgAnalysis.amount<=0) { showToast('No amount detected — save to Vault instead'); return }
     setStatus('img-saving')
-    await addExpense({ vendor:imgAnalysis.vendor||imgAnalysis.title, amount:imgAnalysis.amount, date:imgAnalysis.date?.split('T')[0]||new Date().toISOString().split('T')[0], notes:imgAnalysis.summary||null })
+    const vendor = imgAnalysis.vendor||imgAnalysis.title
+    const { data: vaultItem } = await addVaultItem({ title:vendor, file_url:imgDataUrl, ocr_text:imgAnalysis.summary||null, type:'receipt', tags:['receipt'] })
+    await addExpense({ vault_item_id:vaultItem?.id||null, vendor, amount:imgAnalysis.amount, date:imgAnalysis.date?.split('T')[0]||new Date().toISOString().split('T')[0], notes:imgAnalysis.summary||null })
     addCapture({ raw_input:imgAnalysis.summary||imgAnalysis.title, input_type:'image', ai_result:imgAnalysis, classified_as:'expense' })
     showToast('Expense saved'); resetAll()
   }
