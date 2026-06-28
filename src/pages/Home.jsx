@@ -228,7 +228,7 @@ export default function Home() {
         <img
           src={`${import.meta.env.BASE_URL}favicon.png`}
           alt="Memora"
-          style={{ width:92, height:66, objectFit:'contain' }}
+          style={{ width:78, height:56, objectFit:'contain' }}
         />
       </div>
 

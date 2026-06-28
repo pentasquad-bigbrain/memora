@@ -544,14 +544,42 @@ function ReviewModal({ images, onUpdate, onClose }) {
   const [idx, setIdx]       = useState(0)
   const [context, setContext] = useState('')
   const [saving, setSaving] = useState(false)
+  const [parsing, setParsing] = useState(false)
+  const [sortBy, setSortBy] = useState('newest')
 
-  const current = images[idx]
+  const sortedImages = useMemo(() => [...images].sort((a, b) => {
+    if (sortBy === 'oldest') return new Date(a.created_at || 0) - new Date(b.created_at || 0)
+    if (sortBy === 'title') return (a.title || '').localeCompare(b.title || '')
+    if (sortBy === 'type') return (a.type || '').localeCompare(b.type || '')
+    return new Date(b.created_at || 0) - new Date(a.created_at || 0)
+  }), [images, sortBy])
+
+  const current = sortedImages[idx]
   if (!current) { onClose(); return null }
 
   const advance = () => {
     setContext('')
-    if (idx < images.length - 1) setIdx(i => i + 1)
+    if (idx < sortedImages.length - 1) setIdx(i => i + 1)
     else onClose()
+  }
+
+  const handleAIParse = async () => {
+    if (!current.file_url) return
+    setParsing(true)
+    try {
+      const analysis = await analyzeImage(current.file_url)
+      setContext([
+        analysis?.title,
+        analysis?.summary,
+        analysis?.tasks?.length ? `Tasks: ${analysis.tasks.join(', ')}` : null,
+        analysis?.amount ? `Amount: ${analysis.amount}` : null,
+        analysis?.vendor ? `Vendor: ${analysis.vendor}` : null
+      ].filter(Boolean).join('\n'))
+    } catch {
+      setContext(current.ocr_text || '')
+    } finally {
+      setParsing(false)
+    }
   }
 
   const handleSave = async () => {
@@ -569,7 +597,18 @@ function ReviewModal({ images, onUpdate, onClose }) {
           <div style={{ width: 36, height: 4, background: 'var(--border)', borderRadius: 2, margin: '0 auto 12px' }} />
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
             <div style={{ fontSize: 15, fontWeight: 600 }}>Add context</div>
-            <span style={{ fontSize: 12, color: 'var(--muted)', background: 'var(--bg)', padding: '3px 10px', borderRadius: 20 }}>{idx + 1} / {images.length}</span>
+            <span style={{ fontSize: 12, color: 'var(--muted)', background: 'var(--bg)', padding: '3px 10px', borderRadius: 20 }}>{idx + 1} / {sortedImages.length}</span>
+          </div>
+          <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
+            <button onClick={handleAIParse} disabled={parsing} className="btn btn-ghost" style={{ flex: 1, fontSize: 12, minHeight: 34, gap: 6 }}>
+              {parsing ? <><div className="spinner" style={{ width: 12, height: 12 }} /> Parsing...</> : <><i className="ti ti-sparkles" style={{ fontSize: 13 }} /> AI Parse</>}
+            </button>
+            <select className="input" value={sortBy} onChange={e => { setSortBy(e.target.value); setIdx(0); setContext('') }} style={{ flex: 1, minHeight: 34, padding: '6px 10px', fontSize: 12 }}>
+              <option value="newest">Newest first</option>
+              <option value="oldest">Oldest first</option>
+              <option value="title">Title A-Z</option>
+              <option value="type">Type</option>
+            </select>
           </div>
         </div>
 
@@ -1019,13 +1058,21 @@ export function Journal() {
   const weekDays = Array.from({ length: 7 }, (_, i) => { const d = new Date(centerDate); d.setDate(centerDate.getDate() - 3 + i); return d })
   const selectedDate = weekDays[selectedDay]
   const dateStr = `${selectedDate.getFullYear()}-${String(selectedDate.getMonth()+1).padStart(2,'0')}-${String(selectedDate.getDate()).padStart(2,'0')}`
+  const draftKey = `memora-journal-draft-${dateStr}`
   const isFutureDate = selectedDate > todayDate && selectedDate.toDateString() !== todayDate.toDateString()
 
   useEffect(() => {
     setLogEntries([]); setNewEntryText(''); setEditingId(null)
     setAiSummary(null); setJournalImages([]); setPromotedTasks({}); setSavedMode(false)
     fetchJournalEntry(dateStr).then(entry => {
-      if (!entry) return
+      if (!entry) {
+        try {
+          const draft = JSON.parse(localStorage.getItem(draftKey) || 'null')
+          if (draft?.logEntries?.length) setLogEntries(draft.logEntries)
+          if (draft?.journalImages?.length) setJournalImages(draft.journalImages)
+        } catch {}
+        return
+      }
       const summary = entry.auto_summary || null
       if (summary) {
         const { journal_images, log_entries, ...rest } = summary
@@ -1048,6 +1095,15 @@ export function Journal() {
       }
     })
   }, [dateStr])
+
+  useEffect(() => {
+    if (savedMode) return
+    if (!logEntries.length && !journalImages.length) {
+      localStorage.removeItem(draftKey)
+      return
+    }
+    localStorage.setItem(draftKey, JSON.stringify({ logEntries, journalImages, updated_at: new Date().toISOString() }))
+  }, [draftKey, logEntries, journalImages, savedMode])
 
   const isDate = (ts) => new Date(ts).toDateString() === selectedDate.toDateString()
   const dayDone     = tasks.filter(t => t.status === 'done' && t.updated_at && isDate(t.updated_at))
@@ -1201,7 +1257,7 @@ export function Journal() {
     const personalNote = logEntries.map(e => e.text).join('\n\n') || null
     const { error } = await saveJournalEntry({ date: dateStr, personalNote, autoSummary: summary, journalImages, logEntries })
     setSaving(false)
-    if (!error) { showToast('Journal saved'); setSavedMode(true) }
+    if (!error) { localStorage.removeItem(draftKey); showToast('Journal saved'); setSavedMode(true) }
     else showToast('Save failed')
   }
 

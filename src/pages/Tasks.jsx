@@ -168,7 +168,10 @@ function QuickAdd({ onAdd, onFindPerson }) {
     let base
     if (dueDate==='today')    base = startOfDay(new Date())
     else if (dueDate==='tomorrow') base = startOfDay(addDays(new Date(),1))
-    else if (customDate) return customDate
+    else if (customDate) {
+      if (!allDay) return customDate
+      return new Date(`${customDate}T00:00:00`).toISOString()
+    }
     else return null
     if (!allDay&&time) {
       const [h,m] = time.split(':')
@@ -265,7 +268,15 @@ function QuickAdd({ onAdd, onFindPerson }) {
               ))}
             </div>
             {dueDate==='custom' && (
-              <input className="input" type="datetime-local" value={customDate} onChange={e=>setCustomDate(e.target.value)} style={{ marginTop:8 }} />
+              <div style={{ marginTop:8 }}>
+                <input className="input" type={allDay?'date':'datetime-local'} value={customDate} onChange={e=>setCustomDate(e.target.value)} />
+                <label style={{ display:'flex', alignItems:'center', gap:8, cursor:'pointer', marginTop:8, width:'fit-content' }}>
+                  <div onClick={()=>{ setAllDay(s=>!s); setCustomDate('') }} style={{ width:40, height:24, borderRadius:12, background:allDay?'var(--accent)':'var(--border)', position:'relative', cursor:'pointer', transition:'background .2s', flexShrink:0 }}>
+                    <div style={{ position:'absolute', top:3, left:allDay?18:3, width:18, height:18, borderRadius:'50%', background:'#fff', transition:'left .2s' }} />
+                  </div>
+                  <span style={{ fontSize:12, color:'var(--muted)' }}>All day</span>
+                </label>
+              </div>
             )}
           </div>
 

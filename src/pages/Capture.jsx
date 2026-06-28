@@ -475,13 +475,18 @@ export default function Capture() {
     setStatus('img-saving')
     await addVaultItem({ title, file_url:imgDataUrl, ocr_text:desc||null, type, tags })
     addCapture({ raw_input:imgAnalysis?.summary||title, input_type:'image', ai_result:imgAnalysis, classified_as:'note' })
-    showToast('Saved to Vault'); resetAll()
+    showToast('Saved to Vault')
+    setStatus('saved')
+    setTimeout(() => { resetAll(); navigate('/vault') }, 650)
   }
 
   const handleImageDescSave = async (title, desc, tags) => {
+    setStatus('img-saving')
     await addVaultItem({ title:title||imgAnalysis?.title||'Image', file_url:imgDataUrl, ocr_text:desc||imgAnalysis?.summary||null, type:'image', tags })
     addCapture({ raw_input:desc||imgAnalysis?.summary||title, input_type:'image', ai_result:imgAnalysis, classified_as:'note' })
-    showToast('Saved to Vault'); resetAll()
+    showToast('Saved to Vault')
+    setStatus('saved')
+    setTimeout(() => { resetAll(); navigate('/vault') }, 650)
   }
 
   const hideTextUI = ['img-analyzing','img-confirm','img-edit-tasks','img-saving','img-edit-desc','voice-recording','voice-analyzing','voice-editing'].includes(status)
