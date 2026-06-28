@@ -603,7 +603,7 @@ function ReviewModal({ images, onUpdate, onClose }) {
 }
 
 export function Vault() {
-  const { vaultItems, addVaultItem, deleteVaultItem, updateVaultItem, loading, expenses, ideas, addIdea } = useStore()
+  const { vaultItems, addVaultItem, deleteVaultItem, updateVaultItem, deleteExpense, loading, expenses, ideas, addIdea } = useStore()
   const [cat, setCat]           = useState('all')
   const [search, setSearch]     = useState('')
   const [showSearch, setShowSearch] = useState(false)
@@ -646,6 +646,12 @@ export function Vault() {
   const handleDelete = async (id) => {
     const { error } = await deleteVaultItem(id)
     if (!error) showToast('Deleted')
+    else showToast('Delete failed')
+  }
+
+  const handleDeleteExpense = async (id) => {
+    const { error } = await deleteExpense(id)
+    if (!error) showToast('Receipt removed')
     else showToast('Delete failed')
   }
 
@@ -801,6 +807,13 @@ export function Vault() {
                       <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 2 }}>{e.date}</div>
                     </div>
                     <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text)' }}>₹{Math.round(e.amount).toLocaleString('en-IN')}</span>
+                    <button
+                      onClick={() => handleDeleteExpense(e.id)}
+                      title="Delete receipt"
+                      style={{ width: 28, height: 28, borderRadius: '50%', border: 'none', background: 'var(--red-soft)', color: 'var(--red)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}
+                    >
+                      <i className="ti ti-trash" style={{ fontSize: 13 }} />
+                    </button>
                   </div>
                 ))}
               </div>
@@ -949,6 +962,29 @@ export function Vault() {
 // ── Journal ───────────────────────────────────────────────────
 function makeEntry(text) {
   return { id: `${Date.now()}-${Math.random().toString(36).slice(2,7)}`, time: new Date().toISOString(), text }
+}
+
+function buildLocalJournalSummary({ tasksCompleted, ideasCaptured, expenses, logEntries }) {
+  const entries = logEntries.map(e => e.text.trim()).filter(Boolean)
+  const highlights = entries.slice(0, 4)
+  const suggested_tasks = entries
+    .flatMap(text => text.split(/[.!?\n]/))
+    .map(text => text.trim())
+    .filter(text => /(^|\s)(need to|todo|to do|follow up|call|message|email|send|finish|buy|book|schedule|remind|check)\b/i.test(text))
+    .map(text => text.replace(/^(need to|todo|to do)\s+/i, '').trim())
+    .filter(Boolean)
+    .slice(0, 5)
+
+  return {
+    headline: entries[0]?.slice(0, 80) || 'Journal saved for the day',
+    highlights: highlights.length ? highlights : [
+      `${tasksCompleted.length} tasks completed`,
+      `${ideasCaptured.length} ideas captured`,
+      expenses.length ? `${expenses.length} expenses logged` : 'No expenses logged'
+    ],
+    suggested_tasks,
+    notes_followup: []
+  }
 }
 
 export function Journal() {
@@ -1117,7 +1153,16 @@ export function Journal() {
         summary.suggested_tasks.forEach(t => { init[t] = false })
         setPromotedTasks(init)
       }
-    } catch { showToast('AI generation failed') }
+    } catch {
+      const summary = buildLocalJournalSummary({ tasksCompleted: dayDone, ideasCaptured: dayIdeas, expenses: dayExpenses, logEntries })
+      setAiSummary(summary)
+      if (summary.suggested_tasks.length) {
+        const init = {}
+        summary.suggested_tasks.forEach(t => { init[t] = false })
+        setPromotedTasks(init)
+      }
+      showToast('Processed locally')
+    }
     finally { setGenerating(false) }
   }
 
@@ -1144,10 +1189,17 @@ export function Journal() {
         if (summary?.suggested_tasks?.length) {
           const init = {}; summary.suggested_tasks.forEach(t => { init[t] = false }); setPromotedTasks(init)
         }
-      } catch { /* keep null */ }
+      } catch {
+        summary = buildLocalJournalSummary({ tasksCompleted: dayDone, ideasCaptured: dayIdeas, expenses: dayExpenses, logEntries })
+        setAiSummary(summary)
+        if (summary.suggested_tasks.length) {
+          const init = {}; summary.suggested_tasks.forEach(t => { init[t] = false }); setPromotedTasks(init)
+        }
+      }
       finally { setGenerating(false) }
     }
-    const { error } = await saveJournalEntry({ date: dateStr, personalNote: null, autoSummary: summary, journalImages, logEntries })
+    const personalNote = logEntries.map(e => e.text).join('\n\n') || null
+    const { error } = await saveJournalEntry({ date: dateStr, personalNote, autoSummary: summary, journalImages, logEntries })
     setSaving(false)
     if (!error) { showToast('Journal saved'); setSavedMode(true) }
     else showToast('Save failed')

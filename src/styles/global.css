@@ -214,7 +214,8 @@ p  { font-size: 15px; line-height: 1.6; }
   touch-action: manipulation;
   min-height: 32px;
 }
-.pill.active { background: var(--text); color: #fff; border-color: var(--text); }
+.pill.active { background: var(--text); color: var(--surface); border-color: var(--text); }
+[data-theme="dark"] .pill.active { background: var(--surface); color: var(--text); border-color: var(--border-strong); }
 .pill.accent { background: var(--accent-soft); color: var(--accent-dark); border-color: var(--accent-mid); }
 
 /* ── Nudge ─────────────────────────────────────────────── */

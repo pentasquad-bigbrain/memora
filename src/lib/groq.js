@@ -174,7 +174,7 @@ Today's activity:
 - Tasks completed: ${tasksCompleted.map(t => t.title).join(', ') || 'none'}
 - Ideas captured: ${ideasCaptured.map(i => i.title).join(', ') || 'none'}
 - Expenses: ${expenses.map(e => `₹${e.amount} at ${e.vendor}`).join(', ') || 'none'}
-- Captures: ${captures?.map(c => c.raw_text || c.title || '').filter(Boolean).join(', ') || 'none'}
+- Captures: ${captures?.map(c => c.raw_input || c.raw_text || c.title || '').filter(Boolean).join(', ') || 'none'}
 ${logText ? `\nJournal entries:\n${logText}` : ''}`
 
   const completion = await groq.chat.completions.create({

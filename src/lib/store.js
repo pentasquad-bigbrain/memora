@@ -1,6 +1,36 @@
 import { create } from 'zustand'
 import { supabase } from './supabase'
 
+const pickKnown = (input, keys) =>
+  Object.fromEntries(
+    keys
+      .filter((key) => input[key] !== undefined)
+      .map((key) => [key, input[key]])
+  )
+
+const normalizeTask = (task) => ({
+  ...pickKnown(task, ['project_id', 'person_id', 'title', 'notes', 'due_at', 'progress', 'status', 'source']),
+  source: ['manual', 'ai_capture', 'voice', 'screenshot'].includes(task.source) ? task.source : 'manual'
+})
+
+const normalizeIdea = (idea) => ({
+  ...pickKnown(idea, ['project_id', 'title', 'body', 'tags', 'status', 'source']),
+  source: ['capture', 'screenshot', 'voice', 'manual'].includes(idea.source) ? idea.source : 'manual'
+})
+
+const normalizePerson = (person) => ({
+  ...pickKnown(person, ['name', 'role', 'avatar_url', 'last_interaction']),
+  role: ['client', 'team', 'personal', 'other'].includes(person.role) ? person.role : 'other'
+})
+
+const normalizeVaultItem = (item) => ({
+  ...pickKnown(item, ['project_id', 'idea_id', 'type', 'title', 'file_url', 'ocr_text', 'tags']),
+  type: ['screenshot', 'document', 'receipt', 'image', 'note'].includes(item.type) ? item.type : 'note'
+})
+
+const normalizeExpense = (expense) =>
+  pickKnown(expense, ['project_id', 'vault_item_id', 'vendor', 'amount', 'currency', 'category', 'date', 'notes'])
+
 export const useStore = create((set, get) => ({
   // ── Auth ──────────────────────────────────────────────────
   user: null,
@@ -80,7 +110,7 @@ export const useStore = create((set, get) => ({
   addTask: async (task) => {
     const { user, activeSpace } = get()
     const { data, error } = await supabase.from('tasks').insert({
-      ...task,
+      ...normalizeTask(task),
       user_id: user.id,
       space_id: activeSpace?.id || null
     }).select().single()
@@ -89,8 +119,9 @@ export const useStore = create((set, get) => ({
   },
 
   updateTask: async (id, updates) => {
-    const { error } = await supabase.from('tasks').update({ ...updates, updated_at: new Date().toISOString() }).eq('id', id)
-    if (!error) set((s) => ({ tasks: s.tasks.map(t => t.id === id ? { ...t, ...updates } : t) }))
+    const cleaned = normalizeTask(updates)
+    const { error } = await supabase.from('tasks').update({ ...cleaned, updated_at: new Date().toISOString() }).eq('id', id)
+    if (!error) set((s) => ({ tasks: s.tasks.map(t => t.id === id ? { ...t, ...cleaned } : t) }))
     return { error }
   },
 
@@ -98,7 +129,7 @@ export const useStore = create((set, get) => ({
   addIdea: async (idea) => {
     const { user, activeSpace } = get()
     const { data, error } = await supabase.from('ideas').insert({
-      ...idea,
+      ...normalizeIdea(idea),
       user_id: user.id,
       space_id: activeSpace?.id || null
     }).select().single()
@@ -110,7 +141,7 @@ export const useStore = create((set, get) => ({
   addPerson: async (person) => {
     const { user, activeSpace } = get()
     const { data, error } = await supabase.from('people').insert({
-      ...person,
+      ...normalizePerson(person),
       user_id: user.id,
       space_id: activeSpace?.id || null
     }).select().single()
@@ -122,7 +153,7 @@ export const useStore = create((set, get) => ({
   addExpense: async (expense) => {
     const { user, activeSpace } = get()
     const { data, error } = await supabase.from('expenses').insert({
-      ...expense,
+      ...normalizeExpense(expense),
       user_id: user.id,
       space_id: activeSpace?.id || null
     }).select().single()
@@ -158,7 +189,7 @@ export const useStore = create((set, get) => ({
   addVaultItem: async (item) => {
     const { user, activeSpace } = get()
     const { data, error } = await supabase.from('vault_items').insert({
-      ...item,
+      ...normalizeVaultItem(item),
       user_id: user.id,
       space_id: activeSpace?.id || null
     }).select().single()
@@ -205,7 +236,8 @@ export const useStore = create((set, get) => ({
     return { error }
   },
   updateVaultItem: async (id, updates) => {
-    const { error } = await supabase.from('vault_items').update({ ...updates, updated_at: new Date().toISOString() }).eq('id', id)
+    const cleaned = normalizeVaultItem(updates)
+    const { error } = await supabase.from('vault_items').update(cleaned).eq('id', id)
     if (!error) set(s => ({ vaultItems: s.vaultItems.map(v => v.id === id ? { ...v, ...updates } : v) }))
     return { error }
   },
@@ -220,6 +252,11 @@ export const useStore = create((set, get) => ({
       const spaces = s.spaces.filter(sp => sp.id !== id)
       return { spaces, activeSpace: s.activeSpace?.id === id ? (spaces[0] || null) : s.activeSpace }
     })
+    return { error }
+  },
+  deleteExpense: async (id) => {
+    const { error } = await supabase.from('expenses').delete().eq('id', id)
+    if (!error) set(s => ({ expenses: s.expenses.filter(e => e.id !== id) }))
     return { error }
   },
 
