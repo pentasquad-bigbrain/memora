@@ -9,8 +9,13 @@ const pickKnown = (input, keys) =>
   )
 
 const normalizeTask = (task) => ({
-  ...pickKnown(task, ['project_id', 'person_id', 'title', 'notes', 'due_at', 'progress', 'status', 'source']),
-  source: ['manual', 'ai_capture', 'voice', 'screenshot'].includes(task.source) ? task.source : 'manual'
+  ...pickKnown(task, ['project_id', 'person_id', 'title', 'notes', 'due_at', 'reminder_at', 'priority', 'progress', 'status', 'source']),
+  ...(task.priority !== undefined
+    ? { priority: task.priority === 'normal' ? 'med' : task.priority }
+    : {}),
+  ...(task.source !== undefined
+    ? { source: ['manual', 'ai_capture', 'voice', 'screenshot'].includes(task.source) ? task.source : 'manual' }
+    : {})
 })
 
 const normalizeIdea = (idea) => ({
@@ -110,7 +115,7 @@ export const useStore = create((set, get) => ({
   addTask: async (task) => {
     const { user, activeSpace } = get()
     const { data, error } = await supabase.from('tasks').insert({
-      ...normalizeTask(task),
+      ...normalizeTask({ ...task, priority: task.priority || 'med' }),
       user_id: user.id,
       space_id: activeSpace?.id || null
     }).select().single()

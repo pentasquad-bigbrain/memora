@@ -57,6 +57,8 @@ create table tasks (
   title text not null,
   notes text,
   due_at timestamptz,
+  reminder_at timestamptz,
+  priority text check (priority in ('low','med','high')) default 'med',
   progress integer default 0 check (progress >= 0 and progress <= 100),
   status text check (status in ('todo','in_progress','done')) default 'todo',
   source text check (source in ('manual','ai_capture','voice','screenshot')) default 'manual',

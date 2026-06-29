@@ -120,7 +120,7 @@ function QuickAdd({ onAdd, onFindPerson }) {
   const [customDate, setCustomDate] = useState('')
   const [allDay,     setAllDay]     = useState(true)
   const [time,       setTime]       = useState('')
-  const [priority,   setPriority]   = useState('')
+  const [priority,   setPriority]   = useState('med')
   const [reminder,   setReminder]   = useState('')
   const [reminderMenu, setReminderMenu] = useState(false)
   const [parsing,    setParsing]    = useState(false)
@@ -192,7 +192,7 @@ function QuickAdd({ onAdd, onFindPerson }) {
     const reminderAt = reminder || null
     await onAdd({ title:finalTitle, due_at:buildDueAt(), reminder_at:reminderAt, priority:priority||null, status:'todo', progress:0, source:'manual', person_id })
     if (reminderAt) scheduleReminder(finalTitle, reminderAt)
-    setTitle(''); setDueDate(null); setCustomDate(''); setAllDay(true); setTime(''); setPriority(''); setReminder(''); setSaving(false); setParsed(null); setOpen(false)
+    setTitle(''); setDueDate(null); setCustomDate(''); setAllDay(true); setTime(''); setPriority('med'); setReminder(''); setSaving(false); setParsed(null); setOpen(false)
   }
 
   const handleKey = (e) => {
@@ -361,8 +361,10 @@ function TaskModal({ taskId, onClose, onUpdate, onDelete }) {
 
   const [editTitle,      setEditTitle]      = useState(task?.title||'')
   const [editNotes,      setEditNotes]      = useState(task?.notes||'')
-  const [editDue,        setEditDue]        = useState(task?.due_at?new Date(task.due_at).toISOString().slice(0,16):'')
-  const [editPriority,   setEditPriority]   = useState(task?.priority||'')
+  const initialAllDay = task?.due_at ? new Date(task.due_at).getHours()===0&&new Date(task.due_at).getMinutes()===0 : true
+  const [editAllDay,     setEditAllDay]     = useState(initialAllDay)
+  const [editDue,        setEditDue]        = useState(task?.due_at?format(new Date(task.due_at), initialAllDay?'yyyy-MM-dd':"yyyy-MM-dd'T'HH:mm"):'')
+  const [editPriority,   setEditPriority]   = useState(task?.priority||'med')
   const [editReminder,   setEditReminder]   = useState(task?.reminder_at?new Date(task.reminder_at).toISOString().slice(0,16):'')
   const [editReminderMenu, setEditReminderMenu] = useState(false)
   const [editProgress,   setEditProgress]   = useState(task?.progress||0)
@@ -377,7 +379,10 @@ function TaskModal({ taskId, onClose, onUpdate, onDelete }) {
     setSaving(true)
     const status = editProgress===100?'done':editProgress>0?'in_progress':'todo'
     const reminderAt = editReminder||null
-    await onUpdate(task.id, { title:editTitle.trim(), notes:editNotes.trim()||null, due_at:editDue||null, priority:editPriority||null, reminder_at:reminderAt, progress:editProgress, status, person_id:editPersonId||null })
+    const dueAt = editDue
+      ? (editAllDay ? new Date(`${editDue}T00:00:00`).toISOString() : new Date(editDue).toISOString())
+      : null
+    await onUpdate(task.id, { title:editTitle.trim(), notes:editNotes.trim()||null, due_at:dueAt, priority:editPriority||'med', reminder_at:reminderAt, progress:editProgress, status, person_id:editPersonId||null })
     if (reminderAt) scheduleReminder(editTitle.trim(), reminderAt)
     setSaving(false); onClose()
   }
@@ -401,7 +406,22 @@ function TaskModal({ taskId, onClose, onUpdate, onDelete }) {
           </div>
           <input className="input" value={editTitle} onChange={e=>setEditTitle(e.target.value)} style={{ marginBottom:10, fontWeight:500, fontSize:16 }} autoFocus />
           <textarea className="input" placeholder="Notes (optional)" value={editNotes} onChange={e=>setEditNotes(e.target.value)} style={{ marginBottom:10, minHeight:70 }} />
-          <input className="input" type="datetime-local" value={editDue} onChange={e=>setEditDue(e.target.value)} style={{ marginBottom:10 }} />
+          <div style={{ display:'flex', gap:10, alignItems:'center', marginBottom:10 }}>
+            <input className="input" type={editAllDay?'date':'datetime-local'} value={editDue} onChange={e=>setEditDue(e.target.value)} style={{ flex:1 }} />
+            <label style={{ display:'flex', alignItems:'center', gap:7, fontSize:12, color:'var(--muted)', whiteSpace:'nowrap', cursor:'pointer' }}>
+              <input
+                type="checkbox"
+                checked={editAllDay}
+                onChange={e => {
+                  const next = e.target.checked
+                  setEditAllDay(next)
+                  setEditDue(value => next ? value.split('T')[0] : (value ? `${value.split('T')[0]}T09:00` : ''))
+                }}
+                style={{ width:16, height:16, accentColor:'var(--accent)' }}
+              />
+              All day
+            </label>
+          </div>
           <div style={{ marginBottom:10 }}>
             <div style={{ fontSize:12, fontWeight:500, color:'var(--muted)', marginBottom:6 }}>Priority</div>
             <div style={{ display:'flex', gap:6 }}>
