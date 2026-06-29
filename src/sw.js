@@ -46,7 +46,7 @@ self.addEventListener('fetch', (event) => {
 self.addEventListener('notificationclick', (event) => {
   event.notification.close()
   const actionPath = {
-    task: '/memora/?open=capture&intent=task',
+    task: '/memora/?route=/tasks%3FquickAdd%3D1',
     capture: '/memora/?open=capture',
     voice: '/memora/?open=capture&intent=voice'
   }[event.action] || '/memora/?open=capture'

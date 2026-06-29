@@ -1,4 +1,4 @@
-import { useState, useMemo, useRef } from 'react'
+import { useState, useMemo, useRef, useEffect } from 'react'
 import { useStore } from '../lib/store'
 import { parseTaskQuick } from '../lib/groq'
 import { format, isToday, isTomorrow, isPast, isFuture, addDays, startOfDay } from 'date-fns'
@@ -185,8 +185,8 @@ function SlideToComplete({ onComplete, label='Slide to complete', accentColor='v
 }
 
 // ── Redesigned QuickAdd ───────────────────────────────────────
-function QuickAdd({ onAdd, onFindPerson, people=[] }) {
-  const [open,       setOpen]       = useState(false)
+function QuickAdd({ onAdd, onFindPerson, people=[], initialOpen=false }) {
+  const [open,       setOpen]       = useState(initialOpen)
   const [title,      setTitle]      = useState('')
   const [dueDate,    setDueDate]    = useState(null)
   const [customDate, setCustomDate] = useState('')
@@ -203,6 +203,13 @@ function QuickAdd({ onAdd, onFindPerson, people=[] }) {
   const recognitionRef = useRef(null)
   const inputRef = useRef(null)
   const hasVoiceSupport = typeof window!=='undefined'&&!!(window.SpeechRecognition||window.webkitSpeechRecognition)
+
+  useEffect(() => {
+    if (!initialOpen) return
+    setOpen(true)
+    const timer = setTimeout(()=>inputRef.current?.focus(), 80)
+    return () => clearTimeout(timer)
+  }, [initialOpen])
 
   const toggleListening = () => {
     if (!hasVoiceSupport) return
@@ -581,6 +588,7 @@ export default function Tasks() {
   const [selectedId, setSelectedId] = useState(null)
   const [toast,      setToast]      = useState(null)
   const [clearing,   setClearing]   = useState(false)
+  const quickAddOpen = typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('quickAdd') === '1'
 
   const showToast = (msg) => { setToast(msg); setTimeout(()=>setToast(null),2500) }
 
@@ -700,7 +708,7 @@ export default function Tasks() {
       </div>
 
       <div className="page-scroll" style={{ paddingTop:14 }}>
-        {activeTab!=='done' && <QuickAdd onAdd={addTask} onFindPerson={findOrCreatePerson} people={people} />}
+        {activeTab!=='done' && <QuickAdd onAdd={addTask} onFindPerson={findOrCreatePerson} people={people} initialOpen={quickAddOpen} />}
 
         {/* Overdue header */}
         {activeTab==='today'&&filtered.some(t=>t.due_at&&isPast(new Date(t.due_at))&&!isToday(new Date(t.due_at))) && (
