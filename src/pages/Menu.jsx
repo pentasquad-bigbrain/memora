@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { useStore } from '../lib/store'
 import { supabase } from '../lib/supabase'
 import { showCaptureNotification } from '../lib/captureNotification'
+import { isSuperUser } from '../lib/adminAccess'
 
 const AVATAR_COLORS = ['avatar-blue','avatar-green','avatar-purple','avatar-amber','avatar-red']
 function initials(name) { return name?.split(' ').map(n=>n[0]).join('').toUpperCase().slice(0,2)||'?' }
@@ -16,7 +17,7 @@ const MENU_ITEMS = [
   { icon:'ti-users',       label:'People',       color:'var(--green)',   dest:'/people' },
   { icon:'ti-bulb',        label:'IdeaLab',      color:'var(--purple)', dest:'/idealab' },
   { icon:'ti-sparkles',    label:'Smart Nudges', color:'var(--amber)',   dest:'/' },
-  { icon:'ti-dashboard',   label:'Admin Dashboard', color:'var(--accent)', dest:'/admin' },
+  { icon:'ti-dashboard',   label:'Admin Dashboard', color:'var(--accent)', dest:'/admin', adminOnly:true },
   { icon:'ti-settings',    label:'Settings',     color:'var(--muted)',   action:'settings' },
   { icon:'ti-info-circle', label:'About Developer', color:'var(--muted)', action:'about' },
   { icon:'ti-trash',       label:'Trash',        color:'var(--red)',     dest:null },
@@ -221,6 +222,7 @@ export default function Menu() {
         <div className="section-label" style={{ marginTop:24 }}>Navigate</div>
         <div style={{ background:'var(--bg)', borderRadius:'var(--r)', border:'1px solid var(--border)', overflow:'hidden' }}>
           {MENU_ITEMS.map((item,i) => (
+            item.adminOnly && !isSuperUser(user) ? null :
             <button key={item.label} onClick={()=>item.dest?navigate(item.dest):item.action==='settings'?setSettingsOpen(true):item.action==='about'?setAboutOpen(true):null} style={{ display:'flex', alignItems:'center', gap:12, width:'100%', padding:'14px 16px', background:'none', border:'none', borderBottom:i<MENU_ITEMS.length-1?'1px solid var(--border)':'none', cursor:item.dest||item.action?'pointer':'default', fontFamily:'inherit', textAlign:'left' }}>
               <div style={{ width:32, height:32, borderRadius:8, background:`${item.color}18`, display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>
                 <i className={`ti ${item.icon}`} style={{ fontSize:17, color:item.color }} />

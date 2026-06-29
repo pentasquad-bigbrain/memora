@@ -47,7 +47,7 @@ self.addEventListener('notificationclick', (event) => {
   event.notification.close()
   const actionPath = {
     task: '/memora/capture?intent=task',
-    note: '/memora/capture?intent=note',
+    capture: '/memora/capture',
     voice: '/memora/capture?intent=voice'
   }[event.action] || '/memora/capture'
 

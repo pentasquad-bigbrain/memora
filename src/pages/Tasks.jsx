@@ -381,7 +381,7 @@ function QuickAdd({ onAdd, onFindPerson, people=[] }) {
             <div style={{ fontSize:12, fontWeight:500, color:'var(--muted)', marginBottom:6 }}>Priority</div>
             <div style={{ display:'flex', gap:6 }}>
               {Object.entries(PRIORITY_META).map(([key,p])=>(
-                <button key={key} onClick={()=>setPriority(priority===key?'':key)} style={{ flex:1, padding:'7px 0', borderRadius:'var(--r-sm)', border:'1.5px solid', cursor:'pointer', fontFamily:'inherit', fontSize:12, fontWeight:600, background:priority===key?p.bg:'transparent', color:priority===key?p.color:'var(--muted)', borderColor:priority===key?p.color:'var(--border)' }}>
+                <button key={key} onClick={()=>setPriority(key)} style={{ flex:1, padding:'7px 0', borderRadius:'var(--r-sm)', border:'1.5px solid', cursor:'pointer', fontFamily:'inherit', fontSize:12, fontWeight:600, background:priority===key?p.bg:'transparent', color:priority===key?p.color:'var(--muted)', borderColor:priority===key?p.color:'var(--border)' }}>
                   {p.label}
                 </button>
               ))}
@@ -507,7 +507,7 @@ function TaskModal({ taskId, onClose, onUpdate, onDelete }) {
             <div style={{ fontSize:12, fontWeight:500, color:'var(--muted)', marginBottom:6 }}>Priority</div>
             <div style={{ display:'flex', gap:6 }}>
               {Object.entries(PRIORITY_META).map(([key,p])=>(
-                <button key={key} onClick={()=>setEditPriority(editPriority===key?'':key)} style={{ flex:1, padding:'7px 0', borderRadius:'var(--r-sm)', border:'1.5px solid', cursor:'pointer', fontFamily:'inherit', fontSize:12, fontWeight:600, background:editPriority===key?p.bg:'transparent', color:editPriority===key?p.color:'var(--muted)', borderColor:editPriority===key?p.color:'var(--border)' }}>
+                <button key={key} onClick={()=>setEditPriority(key)} style={{ flex:1, padding:'7px 0', borderRadius:'var(--r-sm)', border:'1.5px solid', cursor:'pointer', fontFamily:'inherit', fontSize:12, fontWeight:600, background:editPriority===key?p.bg:'transparent', color:editPriority===key?p.color:'var(--muted)', borderColor:editPriority===key?p.color:'var(--border)' }}>
                   {p.label}
                 </button>
               ))}

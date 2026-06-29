@@ -140,7 +140,7 @@ function EditForm({ result, transcript, imgDataUrl, onConfirm, onCancel }) {
               <div style={{ fontSize:11, fontWeight:600, color:'var(--muted)', textTransform:'uppercase', letterSpacing:.4, marginBottom:6 }}>Priority</div>
               <div style={{ display:'flex', gap:6 }}>
                 {Object.entries(PRIORITY_META).map(([key,p])=>(
-                  <button key={key} onClick={()=>setEditPriority(editPriority===key?'':key)} style={{ flex:1, padding:'7px 0', borderRadius:'var(--r-sm)', border:'1.5px solid', cursor:'pointer', fontFamily:'inherit', fontSize:12, fontWeight:600, background:editPriority===key?p.bg:'transparent', color:editPriority===key?p.color:'var(--muted)', borderColor:editPriority===key?p.color:'var(--border)' }}>
+                  <button key={key} onClick={()=>setEditPriority(key)} style={{ flex:1, padding:'7px 0', borderRadius:'var(--r-sm)', border:'1.5px solid', cursor:'pointer', fontFamily:'inherit', fontSize:12, fontWeight:600, background:editPriority===key?p.bg:'transparent', color:editPriority===key?p.color:'var(--muted)', borderColor:editPriority===key?p.color:'var(--border)' }}>
                     {p.label}
                   </button>
                 ))}
@@ -210,7 +210,7 @@ function ImageTasksEditor({ imgAnalysis, imgDataUrl, onSave, onBack }) {
       <div style={{ fontSize:11, fontWeight:600, color:'var(--muted)', textTransform:'uppercase', letterSpacing:.4, marginBottom:6 }}>Priority</div>
       <div style={{ display:'flex', gap:6, marginBottom:10 }}>
         {Object.entries(PRIORITY_META).map(([key,p])=>(
-          <button key={key} onClick={()=>setPriority(priority===key?'':key)} style={{ flex:1, padding:'7px 0', borderRadius:'var(--r-sm)', border:'1.5px solid', cursor:'pointer', fontFamily:'inherit', fontSize:12, fontWeight:600, background:priority===key?p.bg:'transparent', color:priority===key?p.color:'var(--muted)', borderColor:priority===key?p.color:'var(--border)' }}>
+          <button key={key} onClick={()=>setPriority(key)} style={{ flex:1, padding:'7px 0', borderRadius:'var(--r-sm)', border:'1.5px solid', cursor:'pointer', fontFamily:'inherit', fontSize:12, fontWeight:600, background:priority===key?p.bg:'transparent', color:priority===key?p.color:'var(--muted)', borderColor:priority===key?p.color:'var(--border)' }}>
             {p.label}
           </button>
         ))}

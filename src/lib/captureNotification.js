@@ -24,7 +24,7 @@ export async function showCaptureNotification() {
     badge: '/memora/icon-192.png',
     actions: [
       { action: 'task', title: '+ Task' },
-      { action: 'note', title: 'Note' },
+      { action: 'capture', title: 'Capture' },
       { action: 'voice', title: 'Voice' }
     ],
     data: { url: '/memora/capture' }

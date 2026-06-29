@@ -45,7 +45,7 @@ export default defineConfig({
         },
         shortcuts: [
           { name: 'New task', short_name: 'Task', description: 'Capture a task', url: '/memora/capture?intent=task', icons: [{ src: 'icon-192.png', sizes: '192x192' }] },
-          { name: 'New note', short_name: 'Note', description: 'Capture a note', url: '/memora/capture?intent=note', icons: [{ src: 'icon-192.png', sizes: '192x192' }] },
+          { name: 'Capture', short_name: 'Capture', description: 'Open capture page', url: '/memora/capture', icons: [{ src: 'icon-192.png', sizes: '192x192' }] },
           { name: 'Voice capture', short_name: 'Voice', description: 'Capture by voice', url: '/memora/capture?intent=voice', icons: [{ src: 'icon-192.png', sizes: '192x192' }] }
         ],
         icons: [

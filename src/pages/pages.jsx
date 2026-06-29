@@ -2125,7 +2125,7 @@ export function IdeaLab() {
                   {Object.entries(PRIORITY_META).map(([key, p]) => (
                     <button
                       key={key}
-                      onClick={() => setIdeaTaskPriority(ideaTaskPriority === key ? '' : key)}
+                      onClick={() => setIdeaTaskPriority(key)}
                       style={{
                         padding: '6px 10px',
                         borderRadius: 'var(--r-sm)',
