@@ -15,6 +15,7 @@ export const PRIORITY_META = {
 // Schedule reminder notification
 function scheduleReminder(title, reminderAt) {
   if (!reminderAt || !('Notification' in window)) return
+  if (localStorage.getItem('memora-notifications') !== 'on') return
   const delay = new Date(reminderAt) - Date.now()
   if (delay <= 0) return
   const go = () => new Notification('⏰ Memora Reminder', { body: title, icon: '/memora/icon-192.png' })

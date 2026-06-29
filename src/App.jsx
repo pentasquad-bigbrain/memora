@@ -14,6 +14,8 @@ import Journal from './pages/Journal'
 import IdeaLab from './pages/IdeaLab'
 import Menu from './pages/Menu'
 import Auth from './pages/Auth'
+import Admin from './pages/Admin'
+import { showCaptureNotification } from './lib/captureNotification'
 
 export default function App() {
   const { user, setUser, fetchSpaces, fetchAll } = useStore()
@@ -21,6 +23,9 @@ export default function App() {
   useEffect(() => {
     const saved = localStorage.getItem('memora-theme') || 'light'
     document.documentElement.setAttribute('data-theme', saved)
+    if (localStorage.getItem('memora-notifications') === 'on') {
+      showCaptureNotification()
+    }
   }, [])
 
   useEffect(() => {
@@ -71,6 +76,7 @@ export default function App() {
         <Route path="/journal" element={<Journal />} />
         <Route path="/idealab" element={<IdeaLab />} />
         <Route path="/menu"    element={<Menu />} />
+        <Route path="/admin"   element={<Admin />} />
         <Route path="*"        element={<Navigate to="/" />} />
       </Routes>
       <BottomNav />

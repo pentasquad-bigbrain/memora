@@ -11,6 +11,9 @@ export default defineConfig({
   plugins: [
     react(),
     VitePWA({
+      strategies: 'injectManifest',
+      srcDir: 'src',
+      filename: 'sw.js',
       registerType: 'autoUpdate',
       includeAssets: ['favicon.png', 'apple-touch-icon.png'],
       manifest: {
@@ -24,6 +27,27 @@ export default defineConfig({
         id: '/memora/',
         start_url: '/memora/',
         scope: '/memora/',
+        share_target: {
+          action: '/memora/share',
+          method: 'POST',
+          enctype: 'multipart/form-data',
+          params: {
+            title: 'title',
+            text: 'text',
+            url: 'url',
+            files: [
+              {
+                name: 'media',
+                accept: ['image/*', 'video/*', 'audio/*', 'application/pdf', 'text/plain']
+              }
+            ]
+          }
+        },
+        shortcuts: [
+          { name: 'New task', short_name: 'Task', description: 'Capture a task', url: '/memora/capture?intent=task', icons: [{ src: 'icon-192.png', sizes: '192x192' }] },
+          { name: 'New note', short_name: 'Note', description: 'Capture a note', url: '/memora/capture?intent=note', icons: [{ src: 'icon-192.png', sizes: '192x192' }] },
+          { name: 'Voice capture', short_name: 'Voice', description: 'Capture by voice', url: '/memora/capture?intent=voice', icons: [{ src: 'icon-192.png', sizes: '192x192' }] }
+        ],
         icons: [
           { src: 'icon-192.png', sizes: '192x192', type: 'image/png', purpose: 'any' },
           { src: 'icon-512.png', sizes: '512x512', type: 'image/png', purpose: 'any maskable' }

@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useStore } from '../lib/store'
 import { supabase } from '../lib/supabase'
+import { showCaptureNotification } from '../lib/captureNotification'
 
 const AVATAR_COLORS = ['avatar-blue','avatar-green','avatar-purple','avatar-amber','avatar-red']
 function initials(name) { return name?.split(' ').map(n=>n[0]).join('').toUpperCase().slice(0,2)||'?' }
@@ -14,8 +15,9 @@ const MENU_ITEMS = [
   { icon:'ti-users',       label:'People',       color:'var(--green)',   dest:'/people' },
   { icon:'ti-bulb',        label:'IdeaLab',      color:'var(--purple)', dest:'/idealab' },
   { icon:'ti-sparkles',    label:'Smart Nudges', color:'var(--amber)',   dest:'/' },
-  { icon:'ti-settings',    label:'Settings',     color:'var(--muted)',   dest:null },
-  { icon:'ti-help-circle', label:'Help & feedback', color:'var(--muted)', dest:null },
+  { icon:'ti-dashboard',   label:'Admin Dashboard', color:'var(--accent)', dest:'/admin' },
+  { icon:'ti-settings',    label:'Settings',     color:'var(--muted)',   action:'settings' },
+  { icon:'ti-info-circle', label:'About Developer', color:'var(--muted)', action:'about' },
   { icon:'ti-trash',       label:'Trash',        color:'var(--red)',     dest:null },
 ]
 
@@ -26,6 +28,9 @@ export default function Menu() {
   const [deleteConfirm, setDeleteConfirm] = useState(null)
   const [deleting, setDeleting] = useState(false)
   const [editProfile, setEditProfile] = useState(false)
+  const [settingsOpen, setSettingsOpen] = useState(false)
+  const [aboutOpen, setAboutOpen] = useState(false)
+  const [notifications, setNotifications] = useState(() => localStorage.getItem('memora-notifications') === 'on')
   const [editName, setEditName] = useState(user?.user_metadata?.full_name || '')
   const [savingProfile, setSavingProfile] = useState(false)
 
@@ -50,6 +55,17 @@ export default function Menu() {
   const handleLogout = async () => {
     await supabase.auth.signOut()
     navigate('/')
+  }
+
+  const toggleNotifications = async () => {
+    const next = !notifications
+    if (next && 'Notification' in window && Notification.permission !== 'granted') {
+      const permission = await Notification.requestPermission()
+      if (permission !== 'granted') return
+    }
+    setNotifications(next)
+    localStorage.setItem('memora-notifications', next ? 'on' : 'off')
+    if (next) await showCaptureNotification()
   }
 
   const handleSaveProfile = async () => {
@@ -86,7 +102,7 @@ export default function Menu() {
         </button>
       </div>
 
-      <div className="page-scroll" style={{ paddingBottom:32 }}>
+      <div className="page-scroll" style={{ paddingBottom:'calc(var(--nav-h) + env(safe-area-inset-bottom) + 44px)' }}>
         {/* User card */}
         <div style={{ display:'flex', alignItems:'center', gap:14, padding:'20px 0 16px' }}>
           <div className={`avatar avatar-lg ${avatarColor(firstName)}`} style={{ flexShrink:0 }}>
@@ -204,12 +220,12 @@ export default function Menu() {
         <div className="section-label" style={{ marginTop:24 }}>Navigate</div>
         <div style={{ background:'var(--bg)', borderRadius:'var(--r)', border:'1px solid var(--border)', overflow:'hidden' }}>
           {MENU_ITEMS.map((item,i) => (
-            <button key={item.label} onClick={()=>item.dest?navigate(item.dest):null} style={{ display:'flex', alignItems:'center', gap:12, width:'100%', padding:'14px 16px', background:'none', border:'none', borderBottom:i<MENU_ITEMS.length-1?'1px solid var(--border)':'none', cursor:item.dest?'pointer':'default', fontFamily:'inherit', textAlign:'left' }}>
+            <button key={item.label} onClick={()=>item.dest?navigate(item.dest):item.action==='settings'?setSettingsOpen(true):item.action==='about'?setAboutOpen(true):null} style={{ display:'flex', alignItems:'center', gap:12, width:'100%', padding:'14px 16px', background:'none', border:'none', borderBottom:i<MENU_ITEMS.length-1?'1px solid var(--border)':'none', cursor:item.dest||item.action?'pointer':'default', fontFamily:'inherit', textAlign:'left' }}>
               <div style={{ width:32, height:32, borderRadius:8, background:`${item.color}18`, display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>
                 <i className={`ti ${item.icon}`} style={{ fontSize:17, color:item.color }} />
               </div>
               <span style={{ flex:1, fontSize:15, fontWeight:500, color:'var(--text)' }}>{item.label}</span>
-              {item.dest && <i className="ti ti-chevron-right" style={{ fontSize:15, color:'var(--hint)' }} />}
+              {(item.dest || item.action) && <i className="ti ti-chevron-right" style={{ fontSize:15, color:'var(--hint)' }} />}
             </button>
           ))}
         </div>
@@ -220,6 +236,37 @@ export default function Menu() {
           <span style={{ fontSize:15, fontWeight:600, color:'var(--red)' }}>Log out</span>
         </button>
       </div>
+      {settingsOpen && (
+        <div style={{ position:'fixed', inset:0, zIndex:1000, background:'rgba(0,0,0,.45)', display:'flex', alignItems:'flex-end', justifyContent:'center' }} onClick={()=>setSettingsOpen(false)}>
+          <div style={{ background:'var(--surface)', borderRadius:'20px 20px 0 0', padding:'18px 20px calc(24px + env(safe-area-inset-bottom))', width:'100%', maxWidth:430 }} onClick={e=>e.stopPropagation()}>
+            <div style={{ width:36, height:4, background:'var(--border)', borderRadius:2, margin:'0 auto 16px' }} />
+            <div style={{ fontSize:18, fontWeight:700, marginBottom:14 }}>Settings</div>
+            <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', gap:12, padding:'14px 0', borderBottom:'1px solid var(--border)' }}>
+              <div>
+                <div style={{ fontSize:14, fontWeight:600 }}>Notifications</div>
+                <div style={{ fontSize:12, color:'var(--muted)', marginTop:2 }}>Task reminders and app alerts</div>
+              </div>
+              <button onClick={toggleNotifications} style={{ width:48, height:28, borderRadius:14, border:'none', background:notifications?'var(--accent)':'var(--border-strong)', position:'relative', cursor:'pointer' }}>
+                <div style={{ position:'absolute', top:4, left:notifications?24:4, width:20, height:20, borderRadius:'50%', background:'#fff', transition:'left .2s' }} />
+              </button>
+            </div>
+            <button className="btn btn-ghost" style={{ width:'100%', marginTop:16 }} onClick={()=>setSettingsOpen(false)}>Done</button>
+          </div>
+        </div>
+      )}
+      {aboutOpen && (
+        <div style={{ position:'fixed', inset:0, zIndex:1000, background:'rgba(0,0,0,.45)', display:'flex', alignItems:'flex-end', justifyContent:'center' }} onClick={()=>setAboutOpen(false)}>
+          <div style={{ background:'var(--surface)', borderRadius:'20px 20px 0 0', padding:'18px 20px calc(24px + env(safe-area-inset-bottom))', width:'100%', maxWidth:430, maxHeight:'82dvh', overflowY:'auto' }} onClick={e=>e.stopPropagation()}>
+            <div style={{ width:36, height:4, background:'var(--border)', borderRadius:2, margin:'0 auto 16px' }} />
+            <div style={{ fontSize:18, fontWeight:700, marginBottom:8 }}>About Zentry Developers</div>
+            <p style={{ fontSize:13, color:'var(--muted)', lineHeight:1.6 }}>Zentry Developers is an independent software studio dedicated to building modern, AI-powered applications that simplify everyday life. We focus on intuitive design, smart automation, and reliable technology to create products that help people stay productive and organized.</p>
+            <div style={{ fontSize:16, fontWeight:700, margin:'18px 0 8px' }}>About the Founder</div>
+            <p style={{ fontSize:13, color:'var(--muted)', lineHeight:1.6 }}>Anton Benny Kayyalathu is the Founder and Lead Developer of Zentry Developers. Passionate about technology and user experience, he creates software that combines thoughtful design with practical solutions. His vision is to build applications that are simple, intelligent, and genuinely useful-helping people work smarter every day.</p>
+            <div style={{ marginTop:16, padding:'12px 14px', background:'var(--bg)', border:'1px solid var(--border)', borderRadius:'var(--r)', fontSize:14, fontWeight:600 }}>"Building technology that makes life simpler."</div>
+            <button className="btn btn-ghost" style={{ width:'100%', marginTop:16 }} onClick={()=>setAboutOpen(false)}>Close</button>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

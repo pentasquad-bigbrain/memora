@@ -20,9 +20,12 @@ Classify the input as one of: task, idea, expense, note, person
 Rules:
 - "task" = action to be done, has a verb + deadline hint
 - "idea" = creative thought, concept, something to explore
-- "expense" = money spent, includes amount + vendor
+- "expense" = any receipt/payment/money movement with an amount + vendor/person. Treat inward, credit, received, recieved, gave, paid back, refund, repayment, deposit, loan return, and transfer as expense records too.
 - "person" = mention of someone to follow up with
 - "note" = everything else
+- For credit/inward/received/recieved/refund/payment-in records, make "amount" negative so receipts can show it as credit.
+- For gave/paid/spent/outward/payment-out records, make "amount" positive.
+- If the user speaks Malayalam or Tamil, translate the meaning into simple English for title/body.
 
 Return ONLY this JSON, no explanation:
 {
@@ -51,6 +54,30 @@ User input: "${rawInput}"`
 
   const raw = completion.choices[0]?.message?.content
   return JSON.parse(raw)
+}
+
+export async function simplifySpokenEnglish(rawInput) {
+  const prompt = `Translate or rewrite this spoken input into simple English. If it is already English, clean it up without changing the meaning.
+
+Return ONLY this JSON:
+{
+  "english": "simple English sentence"
+}
+
+Input: "${rawInput}"`
+
+  try {
+    const completion = await groq.chat.completions.create({
+      model: MODEL,
+      messages: [{ role: 'user', content: prompt }],
+      temperature: 0.1,
+      max_tokens: 120,
+      response_format: { type: 'json_object' }
+    })
+    return JSON.parse(completion.choices[0]?.message?.content)?.english || rawInput
+  } catch {
+    return rawInput
+  }
 }
 
 // ────────────────────────────────────────────────────────────

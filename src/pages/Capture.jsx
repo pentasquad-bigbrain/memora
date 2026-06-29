@@ -1,6 +1,6 @@
-import { useState, useRef } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { parseCapture, analyzeImage } from '../lib/groq'
+import { parseCapture, analyzeImage, simplifySpokenEnglish } from '../lib/groq'
 import { useStore } from '../lib/store'
 import { format } from 'date-fns'
 
@@ -25,6 +25,7 @@ export const PRIORITY_META = {
 
 function scheduleReminder(title, reminderAt) {
   if (!reminderAt || !('Notification' in window)) return
+  if (localStorage.getItem('memora-notifications') !== 'on') return
   const delay = new Date(reminderAt) - Date.now()
   if (delay <= 0) return
   const go = () => new Notification('⏰ Memora Reminder', { body: title, icon: '/memora/icon-192.png' })
@@ -112,6 +113,12 @@ function EditForm({ result, transcript, imgDataUrl, onConfirm, onCancel }) {
         <div style={{ background:'var(--bg)', padding:'10px 14px', borderBottom:'1px solid var(--border)' }}>
           <div style={{ fontSize:10, fontWeight:600, color:'var(--hint)', textTransform:'uppercase', letterSpacing:.4, marginBottom:3 }}>You said</div>
           <div style={{ fontSize:12, color:'var(--muted)', lineHeight:1.5, fontStyle:'italic' }}>"{transcript}"</div>
+          {result._spokenEnglish && result._spokenEnglish !== transcript && (
+            <>
+              <div style={{ fontSize:10, fontWeight:700, color:'var(--accent)', textTransform:'uppercase', letterSpacing:.4, margin:'8px 0 3px' }}>Simple English</div>
+              <div style={{ fontSize:13, color:'var(--text)', lineHeight:1.5 }}>{result._spokenEnglish}</div>
+            </>
+          )}
         </div>
       )}
       <div style={{ background:meta.bg, padding:'10px 14px', borderBottom:'1px solid var(--border)' }}>
@@ -348,6 +355,55 @@ export default function Capture() {
   const [toast, setToast] = useState(null)
   const showToast = (msg) => { setToast(msg); setTimeout(()=>setToast(null),2500) }
 
+  useEffect(() => {
+    const loadSharedPayload = async () => {
+      const params = new URLSearchParams(window.location.search)
+      const hasSharedPayload = params.get('shared') === '1'
+      const intent = params.get('intent')
+      if (intent === 'voice') setTimeout(() => hasVoiceSupport && handleVoice(), 250)
+      if (intent === 'task') setInput('Task: ')
+      if (intent === 'note') setInput('Note: ')
+      if (!hasSharedPayload || !('caches' in window)) return
+      try {
+        const cache = await caches.open('memora-share-target')
+        const response = await cache.match('/memora/shared-data.json')
+        if (!response) return
+        const shared = await response.json()
+        await cache.delete('/memora/shared-data.json')
+        const textParts = [shared.title, shared.text, shared.url].filter(Boolean)
+        if (textParts.length) setInput(textParts.join('\n'))
+        const firstFile = shared.files?.[0]
+        if (firstFile?.dataUrl?.startsWith('data:image/')) {
+          setImgDataUrl(firstFile.dataUrl)
+          setImgAnalysis({
+            type:'photo',
+            title:firstFile.name || shared.title || 'Shared image',
+            summary:textParts.join('\n') || 'Shared to Memora',
+            tasks:[],
+            confidence:1
+          })
+          setStatus('img-confirm')
+        } else if (firstFile) {
+          await addVaultItem({
+            title:firstFile.name || shared.title || 'Shared file',
+            file_url:firstFile.dataUrl,
+            ocr_text:textParts.join('\n') || null,
+            type:firstFile.type?.startsWith('image/') ? 'image' : 'document',
+            tags:['shared']
+          })
+          showToast('Shared file saved to Vault')
+        } else if (textParts.length) {
+          showToast('Shared text added')
+        }
+        window.history.replaceState({}, '', '/memora/capture')
+      } catch (error) {
+        console.error('Shared payload failed', error)
+        showToast('Could not open shared item')
+      }
+    }
+    loadSharedPayload()
+  }, [])
+
   const resetAll = () => {
     setStatus('idle'); setInput(''); setResult(null); setVoiceTranscript('')
     setImgDataUrl(null); setImgAnalysis(null); setCaptureSource('text'); setShowVaultSave(false)
@@ -404,7 +460,7 @@ export default function Capture() {
     setVoiceTranscript(''); setStatus('voice-recording'); setIsListening(true)
     const SR = window.SpeechRecognition||window.webkitSpeechRecognition
     const rec = new SR()
-    rec.lang = navigator.language||'en-US'; rec.continuous=true; rec.interimResults=true
+    rec.lang = navigator.language || 'en-IN'; rec.continuous=true; rec.interimResults=true
     let finalTranscript='', interimTranscript=''
     rec.onresult = (e) => {
       finalTranscript=''; interimTranscript=''
@@ -427,10 +483,12 @@ export default function Capture() {
       if (!transcript) { setStatus('idle'); setVoiceTranscript(''); showToast('Nothing captured'); return }
       setStatus('voice-analyzing')
       try {
-        const parsed = await parseCapture(transcript)
-        setResult(parsed); setVoiceTranscript(transcript); setCaptureSource('voice')
+        const english = await simplifySpokenEnglish(transcript)
+        const parsed = await parseCapture(english)
+        setInput(english)
+        setResult({ ...parsed, _spokenEnglish: english }); setVoiceTranscript(transcript); setCaptureSource('voice')
         preEditStatus.current='voice-editing'; setStatus('voice-editing')
-        addCapture({ raw_input:transcript, input_type:'voice', ai_result:parsed, classified_as:parsed.type })
+        addCapture({ raw_input:transcript, input_type:'voice', ai_result:{ ...parsed, spoken_input:transcript, simplified_english:english }, classified_as:parsed.type })
       } catch { setInput(transcript); setStatus('idle'); setVoiceTranscript(''); showToast('AI failed — text kept') }
     }
     try { recognitionRef.current=rec; rec.start() } catch { setIsListening(false); setStatus('idle'); showToast('Could not start microphone') }

@@ -15,6 +15,7 @@ export const PRIORITY_META = {
 
 function scheduleReminder(title, reminderAt) {
   if (!reminderAt || !('Notification' in window)) return
+  if (localStorage.getItem('memora-notifications') !== 'on') return
   const delay = new Date(reminderAt) - Date.now()
   if (delay <= 0) return
   const go = () => new Notification('⏰ Memora Reminder', { body: title, icon: '/memora/icon-192.png' })
@@ -29,6 +30,73 @@ function dueLabel(due) {
   if (isToday(d))    return { text:`Today · ${format(d,'h:mm a')}`, red:false }
   if (isTomorrow(d)) return { text:`Tomorrow · ${format(d,'h:mm a')}`, red:false }
   return { text:format(d,'EEE d MMM · h:mm a'), red:false }
+}
+
+function SmartTimePicker({ value, onChange, disabled=false }) {
+  const presets = [
+    ['09:00','Morning'],
+    ['13:00','Afternoon'],
+    ['17:00','Evening'],
+    ['20:00','Night'],
+  ]
+  const [hour='09', minute='00'] = (value || '09:00').split(':')
+  const setPart = (nextHour, nextMinute) => onChange(`${String(nextHour).padStart(2,'0')}:${String(nextMinute).padStart(2,'0')}`)
+  return (
+    <div style={{ opacity:disabled ? .5 : 1, pointerEvents:disabled?'none':'auto' }}>
+      <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8, marginBottom:8 }}>
+        <select className="input" value={hour} onChange={e=>setPart(e.target.value, minute)} style={{ padding:'10px 12px', fontSize:14 }}>
+          {Array.from({ length:24 }, (_,i)=>String(i).padStart(2,'0')).map(h => <option key={h} value={h}>{format(new Date(2000,0,1,Number(h),0), 'h a')}</option>)}
+        </select>
+        <select className="input" value={minute} onChange={e=>setPart(hour, e.target.value)} style={{ padding:'10px 12px', fontSize:14 }}>
+          {['00','15','30','45'].map(m => <option key={m} value={m}>{m} min</option>)}
+        </select>
+      </div>
+      <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:6 }}>
+        {presets.map(([time,label]) => (
+          <button key={time} onClick={()=>onChange(time)} style={{ padding:'8px 6px', borderRadius:'var(--r-sm)', border:'1px solid', borderColor:value===time?'var(--accent)':'var(--border)', background:value===time?'var(--accent-soft)':'var(--bg)', color:value===time?'var(--accent)':'var(--muted)', cursor:'pointer', fontFamily:'inherit', fontSize:12, fontWeight:600 }}>
+            {label} {format(new Date(2000,0,1,Number(time.slice(0,2)),Number(time.slice(3))), 'h:mm a')}
+          </button>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+function PersonSearchPicker({ people, value, onChange, onCreate }) {
+  const selected = people.find(p => p.id === value)
+  const [query, setQuery] = useState(selected?.name || '')
+  const [open, setOpen] = useState(false)
+  const matches = people.filter(p => p.name.toLowerCase().includes(query.toLowerCase())).slice(0, 6)
+  const createPerson = async () => {
+    if (!query.trim() || !onCreate) return
+    const person = await onCreate(query.trim())
+    if (person) { onChange(person.id); setQuery(person.name); setOpen(false) }
+  }
+  return (
+    <div style={{ position:'relative', marginBottom:12 }}>
+      <div style={{ fontSize:12, fontWeight:500, color:'var(--muted)', marginBottom:6 }}>Person</div>
+      <div className="search-bar" style={{ margin:0, borderRadius:'var(--r)' }}>
+        <i className="ti ti-user-search" />
+        <input placeholder="Search or add person..." value={query} onFocus={()=>setOpen(true)} onChange={e=>{ setQuery(e.target.value); setOpen(true); if (!e.target.value) onChange('') }} />
+        {value && <button onClick={()=>{ onChange(''); setQuery('') }} style={{ background:'none', border:'none', cursor:'pointer', color:'var(--muted)' }}><i className="ti ti-x" /></button>}
+      </div>
+      {open && query && (
+        <div style={{ position:'absolute', left:0, right:0, top:'calc(100% + 6px)', zIndex:20, background:'var(--surface)', border:'1px solid var(--border)', borderRadius:'var(--r)', boxShadow:'0 8px 24px rgba(0,0,0,.12)', overflow:'hidden' }}>
+          {matches.map(p => (
+            <button key={p.id} onClick={()=>{ onChange(p.id); setQuery(p.name); setOpen(false) }} style={{ display:'flex', alignItems:'center', gap:10, width:'100%', padding:'10px 12px', background:'none', border:'none', borderBottom:'1px solid var(--border)', textAlign:'left', cursor:'pointer', fontFamily:'inherit' }}>
+              <div className={`avatar avatar-sm ${avatarColor(p.name)}`}>{initials(p.name)}</div>
+              <span style={{ fontSize:13, color:'var(--text)' }}>{p.name}</span>
+            </button>
+          ))}
+          {!matches.some(p => p.name.toLowerCase() === query.trim().toLowerCase()) && (
+            <button onClick={createPerson} style={{ display:'flex', alignItems:'center', gap:8, width:'100%', padding:'10px 12px', background:'var(--accent-soft)', border:'none', color:'var(--accent)', cursor:'pointer', fontFamily:'inherit', fontSize:13, fontWeight:600 }}>
+              <i className="ti ti-plus" /> Add "{query.trim()}"
+            </button>
+          )}
+        </div>
+      )}
+    </div>
+  )
 }
 
 // ── Circular progress ring ─────────────────────────────────────
@@ -117,7 +185,7 @@ function SlideToComplete({ onComplete, label='Slide to complete', accentColor='v
 }
 
 // ── Redesigned QuickAdd ───────────────────────────────────────
-function QuickAdd({ onAdd, onFindPerson }) {
+function QuickAdd({ onAdd, onFindPerson, people=[] }) {
   const [open,       setOpen]       = useState(false)
   const [title,      setTitle]      = useState('')
   const [dueDate,    setDueDate]    = useState(null)
@@ -125,6 +193,7 @@ function QuickAdd({ onAdd, onFindPerson }) {
   const [allDay,     setAllDay]     = useState(true)
   const [time,       setTime]       = useState('')
   const [priority,   setPriority]   = useState('med')
+  const [personId,   setPersonId]   = useState('')
   const [reminder,   setReminder]   = useState('')
   const [reminderMenu, setReminderMenu] = useState(false)
   const [parsing,    setParsing]    = useState(false)
@@ -188,7 +257,7 @@ function QuickAdd({ onAdd, onFindPerson }) {
     const finalTitle = (parsed?.title ?? title).trim()
     if (!finalTitle) return
     setSaving(true)
-    let person_id = null
+    let person_id = personId || null
     if (parsed?.person && onFindPerson) {
       const p = await onFindPerson(parsed.person)
       if (p) person_id = p.id
@@ -196,7 +265,7 @@ function QuickAdd({ onAdd, onFindPerson }) {
     const reminderAt = reminder || null
     await onAdd({ title:finalTitle, due_at:buildDueAt(), reminder_at:reminderAt, priority:priority||null, status:'todo', progress:0, source:'manual', person_id })
     if (reminderAt) scheduleReminder(finalTitle, reminderAt)
-    setTitle(''); setDueDate(null); setCustomDate(''); setAllDay(true); setTime(''); setPriority('med'); setReminder(''); setSaving(false); setParsed(null); setOpen(false)
+    setTitle(''); setDueDate(null); setCustomDate(''); setAllDay(true); setTime(''); setPriority('med'); setPersonId(''); setReminder(''); setSaving(false); setParsed(null); setOpen(false)
   }
 
   const handleKey = (e) => {
@@ -289,7 +358,9 @@ function QuickAdd({ onAdd, onFindPerson }) {
             <div style={{ padding:'0 16px 12px' }}>
               <div style={{ fontSize:12, fontWeight:500, color:'var(--muted)', marginBottom:8 }}>Time (optional)</div>
               <div style={{ display:'flex', alignItems:'center', gap:10 }}>
-                <input className="input" type="time" value={time} onChange={e=>setTime(e.target.value)} disabled={allDay} style={{ flex:1, opacity:allDay?.5:1 }} placeholder="--:--" />
+                <div style={{ flex:1 }}>
+                  <SmartTimePicker value={time} onChange={setTime} disabled={allDay} />
+                </div>
                 <label style={{ display:'flex', alignItems:'center', gap:6, cursor:'pointer', whiteSpace:'nowrap' }}>
                   <div onClick={()=>setAllDay(s=>!s)} style={{ width:40, height:24, borderRadius:12, background:allDay?'var(--accent)':'var(--border)', position:'relative', cursor:'pointer', transition:'background .2s', flexShrink:0 }}>
                     <div style={{ position:'absolute', top:3, left:allDay?18:3, width:18, height:18, borderRadius:'50%', background:'#fff', transition:'left .2s' }} />
@@ -299,6 +370,11 @@ function QuickAdd({ onAdd, onFindPerson }) {
               </div>
             </div>
           )}
+
+          {/* Person */}
+          <div style={{ padding:'0 16px 10px' }}>
+            <PersonSearchPicker people={people} value={personId} onChange={setPersonId} onCreate={onFindPerson} />
+          </div>
 
           {/* Priority */}
           <div style={{ padding:'0 16px 10px' }}>
@@ -361,6 +437,7 @@ function QuickAdd({ onAdd, onFindPerson }) {
 function TaskModal({ taskId, onClose, onUpdate, onDelete }) {
   const tasks = useStore(s=>s.tasks)
   const people = useStore(s=>s.people)
+  const findOrCreatePerson = useStore(s=>s.findOrCreatePerson)
   const task = tasks.find(t=>t.id===taskId)
 
   const [editTitle,      setEditTitle]      = useState(task?.title||'')
@@ -459,12 +536,7 @@ function TaskModal({ taskId, onClose, onUpdate, onDelete }) {
               </div>
             )}
           </div>
-          {people.length>0 && (
-            <select className="input" value={editPersonId} onChange={e=>setEditPersonId(e.target.value)} style={{ marginBottom:12 }}>
-              <option value="">No person assigned</option>
-              {people.map(p=><option key={p.id} value={p.id}>{p.name}</option>)}
-            </select>
-          )}
+          <PersonSearchPicker people={people} value={editPersonId} onChange={setEditPersonId} onCreate={findOrCreatePerson} />
           <div style={{ marginBottom:18 }}>
             <div style={{ display:'flex', justifyContent:'space-between', marginBottom:8 }}>
               <span style={{ fontSize:13, color:'var(--muted)' }}>Progress</span>
@@ -502,7 +574,7 @@ const TABS = [
 ]
 
 export default function Tasks() {
-  const { tasks, addTask, updateTask, deleteTask, findOrCreatePerson } = useStore()
+  const { tasks, people, addTask, updateTask, deleteTask, findOrCreatePerson } = useStore()
   const [activeTab,  setActiveTab]  = useState('today')
   const [showSearch, setShowSearch] = useState(false)
   const [search,     setSearch]     = useState('')
@@ -628,7 +700,7 @@ export default function Tasks() {
       </div>
 
       <div className="page-scroll" style={{ paddingTop:14 }}>
-        {activeTab!=='done' && <QuickAdd onAdd={addTask} onFindPerson={findOrCreatePerson} />}
+        {activeTab!=='done' && <QuickAdd onAdd={addTask} onFindPerson={findOrCreatePerson} people={people} />}
 
         {/* Overdue header */}
         {activeTab==='today'&&filtered.some(t=>t.due_at&&isPast(new Date(t.due_at))&&!isToday(new Date(t.due_at))) && (
