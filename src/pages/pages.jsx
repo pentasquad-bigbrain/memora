@@ -757,9 +757,16 @@ export function Vault() {
   // Receipts dashboard data
   const now = new Date()
   const monthReceipts = (expenses || []).filter(e => { const d = new Date(e.date); return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear() })
-  const monthTotal = monthReceipts.reduce((s, e) => s + Number(e.amount), 0)
-  const vendorTotals = monthReceipts.reduce((acc, e) => { acc[e.vendor] = (acc[e.vendor] || 0) + Number(e.amount); return acc }, {})
-  const topVendors = Object.entries(vendorTotals).sort((a, b) => b[1] - a[1]).slice(0, 5)
+  const monthCredits = monthReceipts.reduce((s, e) => s + Math.max(0, -Number(e.amount || 0)), 0)
+  const monthDebits = monthReceipts.reduce((s, e) => s + Math.max(0, Number(e.amount || 0)), 0)
+  const monthNet = monthDebits - monthCredits
+  const vendorTotals = monthReceipts.reduce((acc, e) => {
+    const key = e.vendor || 'Unknown'
+    acc[key] = (acc[key] || 0) + Number(e.amount || 0)
+    return acc
+  }, {})
+  const topVendors = Object.entries(vendorTotals).sort((a, b) => Math.abs(b[1]) - Math.abs(a[1])).slice(0, 5)
+  const topVendorMax = Math.max(...topVendors.map(([, amt]) => Math.abs(amt)), 0)
 
   return (
     <div className="page">
@@ -835,8 +842,12 @@ export function Vault() {
           <div style={{ marginBottom: 16 }}>
             <div style={{ background: 'linear-gradient(135deg, var(--amber-soft), #FEF3C7)', borderRadius: 'var(--r)', padding: '16px', marginBottom: 10, border: '1px solid var(--amber)' }}>
               <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--amber-dark)', textTransform: 'uppercase', letterSpacing: .4, marginBottom: 4 }}>This month</div>
-              <div style={{ fontSize: 28, fontWeight: 700, color: 'var(--text)' }}>₹{Math.round(monthTotal).toLocaleString('en-IN')}</div>
-              <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 2 }}>{monthReceipts.length} expense{monthReceipts.length !== 1 ? 's' : ''} · {format(now, 'MMMM yyyy')}</div>
+              <div style={{ fontSize: 28, fontWeight: 700, color: 'var(--text)' }}>₹{Math.round(monthNet).toLocaleString('en-IN')}</div>
+              <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 2 }}>{monthReceipts.length} entr{monthReceipts.length === 1 ? 'y' : 'ies'} · {format(now, 'MMMM yyyy')}</div>
+              <div style={{ display: 'flex', gap: 8, marginTop: 10, flexWrap: 'wrap' }}>
+                <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--amber-dark)', background: 'rgba(255,255,255,0.55)', borderRadius: 999, padding: '5px 10px' }}>Spent ₹{Math.round(monthDebits).toLocaleString('en-IN')}</span>
+                <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--green-dark)', background: 'rgba(255,255,255,0.55)', borderRadius: 999, padding: '5px 10px' }}>Credits ₹{Math.round(monthCredits).toLocaleString('en-IN')}</span>
+              </div>
             </div>
             {topVendors.length > 0 && (
               <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--r)', padding: '12px 14px' }}>
@@ -846,10 +857,10 @@ export function Vault() {
                     <div style={{ flex: 1 }}>
                       <div style={{ fontSize: 13, fontWeight: 500, marginBottom: 3 }}>{vendor}</div>
                       <div style={{ height: 4, borderRadius: 2, background: 'var(--border)', overflow: 'hidden' }}>
-                        <div style={{ height: '100%', background: 'var(--amber)', borderRadius: 2, width: `${monthTotal > 0 ? (amt / monthTotal) * 100 : 0}%` }} />
+                        <div style={{ height: '100%', background: amt < 0 ? 'var(--green)' : 'var(--amber)', borderRadius: 2, width: `${topVendorMax > 0 ? (Math.abs(amt) / topVendorMax) * 100 : 0}%` }} />
                       </div>
                     </div>
-                    <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--amber-dark)', flexShrink: 0 }}>₹{Math.round(amt).toLocaleString('en-IN')}</span>
+                    <span style={{ fontSize: 13, fontWeight: 600, color: amt < 0 ? 'var(--green-dark)' : 'var(--amber-dark)', flexShrink: 0 }}>{amt < 0 ? '+₹' : '₹'}{Math.round(Math.abs(amt)).toLocaleString('en-IN')}</span>
                   </div>
                 ))}
               </div>
@@ -858,12 +869,15 @@ export function Vault() {
               <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--r)', padding: '4px 14px', marginTop: 10 }}>
                 {monthReceipts.slice(0, 10).map((e, i) => (
                   <div key={e.id} onClick={() => openReceipt(e)} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 0', borderBottom: i < Math.min(monthReceipts.length, 10) - 1 ? '1px solid var(--border)' : 'none', cursor: 'pointer' }}>
-                    <i className="ti ti-receipt" style={{ fontSize: 15, color: 'var(--amber)', flexShrink: 0 }} />
+                    <i className={`ti ${Number(e.amount) < 0 ? 'ti-arrow-down-left' : 'ti-receipt'}`} style={{ fontSize: 15, color: Number(e.amount) < 0 ? 'var(--green)' : 'var(--amber)', flexShrink: 0 }} />
                     <div style={{ flex: 1 }}>
                       <div style={{ fontSize: 13, fontWeight: 500 }}>{e.vendor || 'Unknown'}</div>
                       <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 2 }}>{e.date}</div>
                     </div>
-                    <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text)' }}>₹{Math.round(e.amount).toLocaleString('en-IN')}</span>
+                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 2 }}>
+                      <span style={{ fontSize: 13, fontWeight: 600, color: Number(e.amount) < 0 ? 'var(--green-dark)' : 'var(--text)' }}>{Number(e.amount) < 0 ? '+₹' : '₹'}{Math.round(Math.abs(Number(e.amount))).toLocaleString('en-IN')}</span>
+                      <span style={{ fontSize: 10, fontWeight: 600, color: Number(e.amount) < 0 ? 'var(--green-dark)' : 'var(--muted)', textTransform: 'uppercase', letterSpacing: 0.3 }}>{Number(e.amount) < 0 ? 'Credit' : 'Expense'}</span>
+                    </div>
                     <button
                       onClick={(event) => { event.stopPropagation(); handleDeleteExpense(e.id) }}
                       title="Delete receipt"

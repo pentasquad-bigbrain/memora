@@ -13,6 +13,7 @@ function SlideToComplete({ taskTitle, onComplete, accentColor='var(--accent)' })
   const [dragging, setDragging] = useState(false)
   const [completing, setCompleting] = useState(false)
   const maxDragRef = useRef(0)
+  const pointerOffsetRef = useRef(0)
   const thumbSize = 30
 
   const handlePointerDown = (e) => {
@@ -20,6 +21,8 @@ function SlideToComplete({ taskTitle, onComplete, accentColor='var(--accent)' })
     const track = trackRef.current
     if (!track) return
     maxDragRef.current = track.offsetWidth - thumbSize - 6
+    const thumbRect = e.currentTarget.getBoundingClientRect()
+    pointerOffsetRef.current = e.clientX - thumbRect.left
     setDragging(true)
     e.currentTarget.setPointerCapture?.(e.pointerId)
   }
@@ -28,7 +31,7 @@ function SlideToComplete({ taskTitle, onComplete, accentColor='var(--accent)' })
     const track = trackRef.current
     if (!track) return
     const rect = track.getBoundingClientRect()
-    const x = e.clientX - rect.left - thumbSize/2
+    const x = e.clientX - rect.left - 5 - pointerOffsetRef.current
     setDragX(Math.max(0, Math.min(maxDragRef.current, x)))
   }
   const handlePointerUp = () => {
@@ -42,16 +45,16 @@ function SlideToComplete({ taskTitle, onComplete, accentColor='var(--accent)' })
   return (
     <div
       ref={trackRef}
-      onPointerDown={handlePointerDown}
       onPointerMove={handlePointerMove}
       onPointerUp={handlePointerUp}
       onPointerCancel={handlePointerUp}
-      style={{ position:'relative', height:40, borderRadius:20, background:'var(--bg)', border:'1px solid var(--border)', overflow:'hidden', touchAction:'none', userSelect:'none' }}
+      style={{ position:'relative', height:40, borderRadius:20, background:'var(--bg)', border:'1px solid var(--border)', overflow:'hidden', touchAction:'pan-y', userSelect:'none' }}
     >
       <div style={{ position:'absolute', inset:0, display:'flex', alignItems:'center', justifyContent:'center', gap:4, fontSize:12, fontWeight:600, color:'var(--muted)', pointerEvents:'none', paddingRight:20 }}>
-        <i className="ti ti-chevrons-right" style={{ fontSize:14 }} /> Slide to complete
+        <i className="ti ti-chevrons-right" style={{ fontSize:14 }} /> Hold arrow and slide
       </div>
       <div
+        onPointerDown={handlePointerDown}
         style={{
           position:'absolute', top:5, left:5, width:thumbSize, height:thumbSize, borderRadius:'50%',
           background: completing ? 'var(--green)' : accentColor,
@@ -59,6 +62,7 @@ function SlideToComplete({ taskTitle, onComplete, accentColor='var(--accent)' })
           transform:`translateX(${dragX}px)`,
           transition: dragging ? 'none' : 'transform .25s ease',
           cursor: completing ? 'default' : 'grab',
+          touchAction:'none',
         }}
       >
         <i className={`ti ${completing?'ti-check':'ti-chevron-right'}`} style={{ fontSize:14, color:'#fff' }} />
