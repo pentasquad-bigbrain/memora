@@ -229,11 +229,13 @@ export default function Home() {
 
       {/* Memora Logo */}
       <div style={{ display:'flex', justifyContent:'center', padding:'12px 0 8px' }}>
-        <img
-          src={`${import.meta.env.BASE_URL}favicon.png`}
-          alt="Memora"
-          style={{ width:78, height:56, objectFit:'contain' }}
-        />
+        <div className="memora-ai-logo">
+          <img
+            src={`${import.meta.env.BASE_URL}favicon.png`}
+            alt="Memora"
+            style={{ width:78, height:56, objectFit:'contain', position:'relative', zIndex:2 }}
+          />
+        </div>
       </div>
 
       {/* Greeting */}

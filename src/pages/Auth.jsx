@@ -9,10 +9,16 @@ export default function Auth() {
   const [loading, setLoading] = useState(false)
 
   const handleGoogle = async () => {
-    await supabase.auth.signInWithOAuth({
+    setError('')
+    setLoading(true)
+    const { error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
       options: { redirectTo: `${window.location.origin}/memora/` }
     })
+    if (error) {
+      setError(error.message)
+      setLoading(false)
+    }
   }
 
   const handleEmailAuth = async (e) => {
@@ -101,7 +107,7 @@ export default function Auth() {
           <div style={{ flex: 1, height: 1, background: 'var(--border)' }} />
         </div>
 
-        <button className="btn btn-ghost" style={{ width: '100%', fontSize: 15, padding: '14px' }} onClick={handleGoogle}>
+        <button className="btn btn-ghost" style={{ width: '100%', fontSize: 15, padding: '14px' }} onClick={handleGoogle} disabled={loading}>
           <i className="ti ti-brand-google" style={{ fontSize: 18 }}></i>
           Continue with Google
         </button>

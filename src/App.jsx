@@ -15,6 +15,7 @@ import IdeaLab from './pages/IdeaLab'
 import Menu from './pages/Menu'
 import Auth from './pages/Auth'
 import Admin from './pages/Admin'
+import Calendar from './pages/Calendar'
 import { showCaptureNotification } from './lib/captureNotification'
 
 export default function App() {
@@ -77,6 +78,7 @@ export default function App() {
         <Route path="/idealab" element={<IdeaLab />} />
         <Route path="/menu"    element={<Menu />} />
         <Route path="/admin"   element={<Admin />} />
+        <Route path="/calendar" element={<Calendar />} />
         <Route path="*"        element={<Navigate to="/" />} />
       </Routes>
       <BottomNav />

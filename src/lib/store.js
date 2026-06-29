@@ -50,6 +50,7 @@ const TAG_CACHE_KEYS = {
   ideas: 'memora_idea_tags_cache',
   vaultItems: 'memora_vault_tags_cache'
 }
+const TASK_META_CACHE_KEY = 'memora_task_meta_cache'
 
 const isMissingTagsColumnError = (error) => {
   const message = `${error?.message || ''} ${error?.details || ''} ${error?.hint || ''}`.toLowerCase()
@@ -79,6 +80,46 @@ const mergeEntityTags = (items, key) => {
     ...item,
     tags: Array.isArray(item.tags) && item.tags.length ? item.tags : (cache[item.id] || item.tags || [])
   }))
+}
+
+const readTaskMetaCache = () => {
+  if (typeof window === 'undefined') return {}
+  try { return JSON.parse(window.localStorage.getItem(TASK_META_CACHE_KEY) || '{}') } catch { return {} }
+}
+
+const writeTaskMetaCache = (value) => {
+  if (typeof window === 'undefined') return
+  window.localStorage.setItem(TASK_META_CACHE_KEY, JSON.stringify(value))
+}
+
+const cacheTaskMeta = (id, updates) => {
+  if (!id) return
+  const meta = pickKnown(updates, ['priority', 'reminder_at'])
+  if (!Object.keys(meta).length) return
+  const cache = readTaskMetaCache()
+  cache[id] = { ...(cache[id] || {}), ...meta }
+  writeTaskMetaCache(cache)
+}
+
+const mergeTaskMeta = (tasks) => {
+  const cache = readTaskMetaCache()
+  const nextCache = { ...cache }
+  const merged = (tasks || []).map((task) => {
+    if (task.priority || task.reminder_at) {
+      nextCache[task.id] = {
+        ...(nextCache[task.id] || {}),
+        ...(task.priority ? { priority: task.priority } : {}),
+        ...(task.reminder_at ? { reminder_at: task.reminder_at } : {})
+      }
+    }
+    return {
+      ...task,
+      ...(!task.reminder_at && cache[task.id]?.reminder_at ? { reminder_at: cache[task.id].reminder_at } : {}),
+      priority: task.priority || cache[task.id]?.priority || 'med'
+    }
+  })
+  writeTaskMetaCache(nextCache)
+  return merged
 }
 
 const stripTagsField = (input) => {
@@ -142,7 +183,7 @@ export const useStore = create((set, get) => ({
     ])
 
     set({
-      tasks: tasks || [],
+      tasks: mergeTaskMeta(tasks),
       ideas: mergeEntityTags(ideas, TAG_CACHE_KEYS.ideas),
       people: people || [],
       expenses: expenses || [],
@@ -156,7 +197,17 @@ export const useStore = create((set, get) => ({
   fetchSpaces: async () => {
     const { user } = get()
     if (!user) return
-    const { data } = await supabase.from('spaces').select('*').eq('user_id', user.id)
+    let { data } = await supabase.from('spaces').select('*').eq('user_id', user.id)
+    if (!data?.length) {
+      const { data: created } = await supabase
+        .from('spaces')
+        .insert([
+          { name: 'Personal', type: 'personal', user_id: user.id },
+          { name: 'Work', type: 'work', user_id: user.id }
+        ])
+        .select('*')
+      data = created || []
+    }
     const spaces = data || []
     set({ spaces, activeSpace: spaces[0] || null })
   },
@@ -173,7 +224,11 @@ export const useStore = create((set, get) => ({
     if (error && isMissingTaskColumnError(error)) {
       ;({ data, error } = await supabase.from('tasks').insert(stripTaskCompatFields(payload)).select().single())
     }
-    if (!error) set((s) => ({ tasks: [data, ...s.tasks] }))
+    if (!error) {
+      const merged = { ...data, priority: payload.priority, reminder_at: payload.reminder_at }
+      cacheTaskMeta(data?.id, merged)
+      set((s) => ({ tasks: [merged, ...s.tasks] }))
+    }
     return { data, error }
   },
 
@@ -184,7 +239,10 @@ export const useStore = create((set, get) => ({
     if (error && isMissingTaskColumnError(error)) {
       ;({ error } = await supabase.from('tasks').update(stripTaskCompatFields(payload)).eq('id', id))
     }
-    if (!error) set((s) => ({ tasks: s.tasks.map(t => t.id === id ? { ...t, ...cleaned } : t) }))
+    if (!error) {
+      cacheTaskMeta(id, cleaned)
+      set((s) => ({ tasks: s.tasks.map(t => t.id === id ? { ...t, ...cleaned } : t) }))
+    }
     return { error }
   },
 

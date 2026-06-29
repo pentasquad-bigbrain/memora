@@ -431,6 +431,34 @@ select.input { padding-right: 36px; cursor: pointer; }
   50%       { box-shadow: 0 0 0 10px rgba(239,68,68,0); }
 }
 
+.memora-ai-logo {
+  position: relative;
+  width: 102px;
+  height: 76px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.memora-ai-logo::before,
+.memora-ai-logo::after {
+  content: "";
+  position: absolute;
+  inset: 7px 2px;
+  border-radius: 50%;
+  border: 1px solid rgba(59,130,246,.38);
+  animation: memora-orbit 4.8s ease-in-out infinite;
+}
+.memora-ai-logo::after {
+  inset: 11px 12px;
+  border-color: rgba(139,92,246,.32);
+  animation-duration: 6.2s;
+  animation-direction: reverse;
+}
+@keyframes memora-orbit {
+  0%, 100% { transform: rotate(0deg) scale(1); opacity: .58; }
+  50% { transform: rotate(12deg) scale(1.08); opacity: 1; }
+}
+
 /* ── Toast ──────────────────────────────────────────────── */
 .toast {
   position: fixed;

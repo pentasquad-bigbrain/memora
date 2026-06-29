@@ -12,6 +12,7 @@ const SPACE_ICONS = ['ti-briefcase','ti-user','ti-run','ti-home','ti-star','ti-h
 
 const MENU_ITEMS = [
   { icon:'ti-layout-grid', label:'Projects',     color:'var(--accent)',  dest:'/tasks' },
+  { icon:'ti-calendar',    label:'Calendar',     color:'var(--accent)',  dest:'/calendar' },
   { icon:'ti-users',       label:'People',       color:'var(--green)',   dest:'/people' },
   { icon:'ti-bulb',        label:'IdeaLab',      color:'var(--purple)', dest:'/idealab' },
   { icon:'ti-sparkles',    label:'Smart Nudges', color:'var(--amber)',   dest:'/' },
