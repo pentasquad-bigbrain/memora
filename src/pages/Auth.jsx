@@ -1,15 +1,21 @@
 import { useState } from 'react'
 import { supabase } from '../lib/supabase'
+import { setLocalAdminSession } from '../lib/adminAccess'
 
 export default function Auth() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [mode, setMode] = useState('sign-in') // 'sign-in' | 'sign-up'
   const [error, setError] = useState('')
+  const [message, setMessage] = useState('')
   const [loading, setLoading] = useState(false)
+  const [showAdmin, setShowAdmin] = useState(false)
+  const [adminId, setAdminId] = useState('')
+  const [adminPassword, setAdminPassword] = useState('')
 
   const handleGoogle = async () => {
     setError('')
+    setMessage('')
     setLoading(true)
     const { error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
@@ -24,11 +30,38 @@ export default function Auth() {
   const handleEmailAuth = async (e) => {
     e.preventDefault()
     setError('')
+    setMessage('')
     setLoading(true)
     const fn = mode === 'sign-in' ? 'signInWithPassword' : 'signUp'
     const { error } = await supabase.auth[fn]({ email, password })
     setLoading(false)
     if (error) setError(error.message)
+    else if (mode === 'sign-up') setMessage('Account created. Check your email if confirmation is required.')
+  }
+
+  const handleForgotPassword = async () => {
+    if (!email.trim()) { setError('Enter your email first.'); return }
+    setError('')
+    setMessage('')
+    setLoading(true)
+    const { error } = await supabase.auth.resetPasswordForEmail(email.trim(), {
+      redirectTo: `${window.location.origin}/memora/`
+    })
+    setLoading(false)
+    if (error) setError(error.message)
+    else setMessage('Password reset link sent. Check your email.')
+  }
+
+  const handleAdminLogin = (event) => {
+    event.preventDefault()
+    setError('')
+    setMessage('')
+    if (adminId.trim() === 'admin' && adminPassword === 'admin1212') {
+      setLocalAdminSession(true)
+      window.location.href = `${window.location.origin}/memora/admin`
+      return
+    }
+    setError('Invalid admin credentials.')
   }
 
   return (
@@ -83,6 +116,9 @@ export default function Auth() {
           {error && (
             <p style={{ color: 'var(--red-dark)', fontSize: 13, marginBottom: 10 }}>{error}</p>
           )}
+          {message && (
+            <p style={{ color: 'var(--green-dark)', fontSize: 13, marginBottom: 10 }}>{message}</p>
+          )}
           <button
             className="btn btn-primary"
             type="submit"
@@ -100,6 +136,11 @@ export default function Auth() {
             <>Already have an account? <a onClick={() => setMode('sign-in')} style={{ color: 'var(--accent)', cursor: 'pointer' }}>Sign in</a></>
           )}
         </p>
+        {mode === 'sign-in' && (
+          <button onClick={handleForgotPassword} disabled={loading} style={{ width:'100%', background:'none', border:'none', color:'var(--accent)', cursor:'pointer', fontFamily:'inherit', fontSize:13, marginTop:8 }}>
+            Forgot password?
+          </button>
+        )}
 
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, margin: '20px 0' }}>
           <div style={{ flex: 1, height: 1, background: 'var(--border)' }} />
@@ -111,6 +152,16 @@ export default function Auth() {
           <i className="ti ti-brand-google" style={{ fontSize: 18 }}></i>
           Continue with Google
         </button>
+        <button onClick={() => setShowAdmin(s => !s)} style={{ width:'100%', background:'none', border:'none', color:'var(--muted)', cursor:'pointer', fontFamily:'inherit', fontSize:12, marginTop:14 }}>
+          Admin access
+        </button>
+        {showAdmin && (
+          <form onSubmit={handleAdminLogin} style={{ marginTop:10, padding:12, border:'1px solid var(--border)', borderRadius:'var(--r)', background:'var(--surface)' }}>
+            <input className="input" placeholder="Admin ID" value={adminId} onChange={e=>setAdminId(e.target.value)} style={{ marginBottom:8 }} />
+            <input className="input" placeholder="Admin password" type="password" value={adminPassword} onChange={e=>setAdminPassword(e.target.value)} style={{ marginBottom:8 }} />
+            <button className="btn btn-primary" type="submit" style={{ width:'100%' }}>Open admin</button>
+          </form>
+        )}
         <p style={{ textAlign: 'center', color: 'var(--muted)', fontSize: 12, marginTop: 16, lineHeight: 1.6 }}>
           Your data is private and encrypted.<br />Memora never shares your information.
         </p>

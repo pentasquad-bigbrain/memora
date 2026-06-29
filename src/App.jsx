@@ -17,9 +17,11 @@ import Auth from './pages/Auth'
 import Admin from './pages/Admin'
 import Calendar from './pages/Calendar'
 import { showCaptureNotification } from './lib/captureNotification'
+import { isLocalAdminSession } from './lib/adminAccess'
 
 export default function App() {
   const { user, setUser, fetchSpaces, fetchAll } = useStore()
+  const localAdmin = isLocalAdminSession()
 
   useEffect(() => {
     const saved = localStorage.getItem('memora-theme') || 'light'
@@ -27,44 +29,19 @@ export default function App() {
     if (localStorage.getItem('memora-notifications') === 'on') {
       showCaptureNotification()
     }
+    const timer = setTimeout(() => hideSplash(), 700)
+    return () => clearTimeout(timer)
   }, [])
 
   useEffect(() => {
-    // Restore session on load
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setUser(session?.user ?? null)
-    })
-
-    // Listen for auth changes
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      setUser(session?.user ?? null)
-    })
-
+    supabase.auth.getSession().then(({ data: { session } }) => setUser(session?.user ?? null))
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => setUser(session?.user ?? null))
     return () => subscription.unsubscribe()
-  }, [])
+  }, [setUser])
 
-  useEffect(() => {
-    if (user) {
-      fetchSpaces().then(() => fetchAll())
-    }
-  }, [user])
+  useEffect(() => { if (user) fetchSpaces().then(() => fetchAll()) }, [user, fetchSpaces, fetchAll])
 
-  useEffect(() => {
-    if (user) {
-      const timer = setTimeout(() => {
-        const splash = document.getElementById('splash-screen')
-        if (splash) {
-          splash.classList.add('fade-out')
-          setTimeout(() => {
-            splash.style.display = 'none'
-          }, 500)
-        }
-      }, 800)
-      return () => clearTimeout(timer)
-    }
-  }, [user])
-
-  if (!user) return <Auth />
+  if (!user && !localAdmin) return <Auth />
 
   return (
     <BrowserRouter basename="/memora">
@@ -85,6 +62,13 @@ export default function App() {
       <BottomNav />
     </BrowserRouter>
   )
+}
+
+function hideSplash() {
+  const splash = document.getElementById('splash-screen')
+  if (!splash) return
+  splash.classList.add('fade-out')
+  setTimeout(() => { splash.style.display = 'none' }, 500)
 }
 
 function DeepLinkHandler() {
