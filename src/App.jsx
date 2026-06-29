@@ -1,5 +1,5 @@
 import { useEffect } from 'react'
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
+import { BrowserRouter, Routes, Route, Navigate, useLocation, useNavigate } from 'react-router-dom'
 import { supabase } from './lib/supabase'
 import { useStore } from './lib/store'
 import './styles/global.css'
@@ -68,6 +68,7 @@ export default function App() {
 
   return (
     <BrowserRouter basename="/memora">
+      <DeepLinkHandler />
       <Routes>
         <Route path="/"        element={<Home />} />
         <Route path="/capture" element={<Capture />} />
@@ -84,4 +85,19 @@ export default function App() {
       <BottomNav />
     </BrowserRouter>
   )
+}
+
+function DeepLinkHandler() {
+  const navigate = useNavigate()
+  const location = useLocation()
+
+  useEffect(() => {
+    const params = new URLSearchParams(location.search)
+    if (params.get('open') !== 'capture') return
+    params.delete('open')
+    const nextSearch = params.toString()
+    navigate(`/capture${nextSearch ? `?${nextSearch}` : ''}`, { replace: true })
+  }, [location.search, navigate])
+
+  return null
 }

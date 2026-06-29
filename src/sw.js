@@ -39,17 +39,17 @@ self.addEventListener('fetch', (event) => {
     await cache.put(SHARE_URL, new Response(JSON.stringify(payload), {
       headers: { 'content-type': 'application/json', 'cache-control': 'no-store' }
     }))
-    return Response.redirect('/memora/capture?shared=1', 303)
+    return Response.redirect('/memora/?open=capture&shared=1', 303)
   })())
 })
 
 self.addEventListener('notificationclick', (event) => {
   event.notification.close()
   const actionPath = {
-    task: '/memora/capture?intent=task',
-    capture: '/memora/capture',
-    voice: '/memora/capture?intent=voice'
-  }[event.action] || '/memora/capture'
+    task: '/memora/?open=capture&intent=task',
+    capture: '/memora/?open=capture',
+    voice: '/memora/?open=capture&intent=voice'
+  }[event.action] || '/memora/?open=capture'
 
   event.waitUntil((async () => {
     const allClients = await self.clients.matchAll({ type: 'window', includeUncontrolled: true })

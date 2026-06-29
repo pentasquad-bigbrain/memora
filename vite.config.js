@@ -38,15 +38,15 @@ export default defineConfig({
             files: [
               {
                 name: 'media',
-                accept: ['image/*', 'video/*', 'audio/*', 'application/pdf', 'text/plain']
+                accept: ['image/*', 'image/png', 'image/jpeg', 'image/webp', 'video/*', 'audio/*', 'application/pdf', 'text/plain', '.txt', '.pdf']
               }
             ]
           }
         },
         shortcuts: [
-          { name: 'New task', short_name: 'Task', description: 'Capture a task', url: '/memora/capture?intent=task', icons: [{ src: 'icon-192.png', sizes: '192x192' }] },
-          { name: 'Capture', short_name: 'Capture', description: 'Open capture page', url: '/memora/capture', icons: [{ src: 'icon-192.png', sizes: '192x192' }] },
-          { name: 'Voice capture', short_name: 'Voice', description: 'Capture by voice', url: '/memora/capture?intent=voice', icons: [{ src: 'icon-192.png', sizes: '192x192' }] }
+          { name: 'New task', short_name: 'Task', description: 'Capture a task', url: '/memora/?open=capture&intent=task', icons: [{ src: 'icon-192.png', sizes: '192x192' }] },
+          { name: 'Capture', short_name: 'Capture', description: 'Open capture page', url: '/memora/?open=capture', icons: [{ src: 'icon-192.png', sizes: '192x192' }] },
+          { name: 'Voice capture', short_name: 'Voice', description: 'Capture by voice', url: '/memora/?open=capture&intent=voice', icons: [{ src: 'icon-192.png', sizes: '192x192' }] }
         ],
         icons: [
           { src: 'icon-192.png', sizes: '192x192', type: 'image/png', purpose: 'any' },

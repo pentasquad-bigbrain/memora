@@ -362,7 +362,6 @@ export default function Capture() {
       const intent = params.get('intent')
       if (intent === 'voice') setTimeout(() => hasVoiceSupport && handleVoice(), 250)
       if (intent === 'task') setInput('Task: ')
-      if (intent === 'note') setInput('Note: ')
       if (!hasSharedPayload || !('caches' in window)) return
       try {
         const cache = await caches.open('memora-share-target')
