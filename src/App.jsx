@@ -93,6 +93,13 @@ function DeepLinkHandler() {
 
   useEffect(() => {
     const params = new URLSearchParams(location.search)
+    const restoredRoute = params.get('route')
+    if (restoredRoute) {
+      params.delete('route')
+      const route = restoredRoute.startsWith('/') ? restoredRoute : `/${restoredRoute}`
+      navigate(route, { replace: true })
+      return
+    }
     if (params.get('open') !== 'capture') return
     params.delete('open')
     const nextSearch = params.toString()

@@ -1,0 +1,23 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Memora</title>
+    <script>
+      (function () {
+        var base = '/memora';
+        var path = window.location.pathname;
+        var search = window.location.search || '';
+        var hash = window.location.hash || '';
+        var appPath = path.indexOf(base) === 0 ? path.slice(base.length) : path;
+        if (!appPath || appPath === '/') {
+          window.location.replace(base + '/' + search + hash);
+          return;
+        }
+        window.location.replace(base + '/?route=' + encodeURIComponent(appPath + search + hash));
+      })();
+    </script>
+  </head>
+  <body></body>
+</html>
