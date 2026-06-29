@@ -211,11 +211,12 @@ function VaultItemModal({ item, onClose, onDelete, onUpdate }) {
   const [editTitle,  setEditTitle]  = useState(item.title || '')
   const [editDesc,   setEditDesc]   = useState(item.ocr_text || '')
   const [editType,   setEditType]   = useState(item.type || 'note')
+  const [editTags,   setEditTags]   = useState(item.tags || [])
   const meta = VAULT_META[item.type] || VAULT_META.note
 
   const handleSaveEdit = async () => {
     setSaving(true)
-    await onUpdate(item.id, { title: editTitle.trim() || 'Untitled', ocr_text: editDesc.trim() || null, type: editType })
+    await onUpdate(item.id, { title: editTitle.trim() || 'Untitled', ocr_text: editDesc.trim() || null, type: editType, tags: editTags })
     setSaving(false)
     setEditing(false)
   }
@@ -275,6 +276,7 @@ function VaultItemModal({ item, onClose, onDelete, onUpdate }) {
                   >{t}</button>
                 ))}
               </div>
+              <VaultTagSection tags={editTags} onChange={setEditTags} />
               <div style={{ display: 'flex', gap: 8 }}>
                 <button className="btn btn-primary" style={{ flex: 1 }} onClick={handleSaveEdit} disabled={saving || !editTitle.trim()}>
                   {saving ? 'Saving…' : 'Save changes'}
@@ -845,8 +847,8 @@ export function Vault() {
               <div style={{ fontSize: 28, fontWeight: 700, color: 'var(--text)' }}>₹{Math.round(monthNet).toLocaleString('en-IN')}</div>
               <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 2 }}>{monthReceipts.length} entr{monthReceipts.length === 1 ? 'y' : 'ies'} · {format(now, 'MMMM yyyy')}</div>
               <div style={{ display: 'flex', gap: 8, marginTop: 10, flexWrap: 'wrap' }}>
-                <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--amber-dark)', background: 'rgba(255,255,255,0.55)', borderRadius: 999, padding: '5px 10px' }}>Spent ₹{Math.round(monthDebits).toLocaleString('en-IN')}</span>
-                <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--green-dark)', background: 'rgba(255,255,255,0.55)', borderRadius: 999, padding: '5px 10px' }}>Credits ₹{Math.round(monthCredits).toLocaleString('en-IN')}</span>
+                <span style={{ fontSize: 12, fontWeight: 700, color: '#92400E', background: '#FDE7A8', border: '1px solid #F59E0B', borderRadius: 999, padding: '5px 10px' }}>Spent ₹{Math.round(monthDebits).toLocaleString('en-IN')}</span>
+                <span style={{ fontSize: 12, fontWeight: 700, color: '#166534', background: '#DCFCE7', border: '1px solid #22C55E', borderRadius: 999, padding: '5px 10px' }}>Credits ₹{Math.round(monthCredits).toLocaleString('en-IN')}</span>
               </div>
             </div>
             {topVendors.length > 0 && (

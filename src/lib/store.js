@@ -46,6 +46,46 @@ const stripTaskCompatFields = (task) => {
   return rest
 }
 
+const TAG_CACHE_KEYS = {
+  ideas: 'memora_idea_tags_cache',
+  vaultItems: 'memora_vault_tags_cache'
+}
+
+const isMissingTagsColumnError = (error) => {
+  const message = `${error?.message || ''} ${error?.details || ''} ${error?.hint || ''}`.toLowerCase()
+  return message.includes('tags')
+}
+
+const readTagCache = (key) => {
+  if (typeof window === 'undefined') return {}
+  try { return JSON.parse(window.localStorage.getItem(key) || '{}') } catch { return {} }
+}
+
+const writeTagCache = (key, value) => {
+  if (typeof window === 'undefined') return
+  window.localStorage.setItem(key, JSON.stringify(value))
+}
+
+const cacheEntityTags = (key, id, tags) => {
+  if (!id || tags === undefined) return
+  const cache = readTagCache(key)
+  cache[id] = tags
+  writeTagCache(key, cache)
+}
+
+const mergeEntityTags = (items, key) => {
+  const cache = readTagCache(key)
+  return (items || []).map((item) => ({
+    ...item,
+    tags: Array.isArray(item.tags) && item.tags.length ? item.tags : (cache[item.id] || item.tags || [])
+  }))
+}
+
+const stripTagsField = (input) => {
+  const { tags, ...rest } = input
+  return rest
+}
+
 export const useStore = create((set, get) => ({
   // ── Auth ──────────────────────────────────────────────────
   user: null,
@@ -103,10 +143,10 @@ export const useStore = create((set, get) => ({
 
     set({
       tasks: tasks || [],
-      ideas: ideas || [],
+      ideas: mergeEntityTags(ideas, TAG_CACHE_KEYS.ideas),
       people: people || [],
       expenses: expenses || [],
-      vaultItems: vaultItems || [],
+      vaultItems: mergeEntityTags(vaultItems, TAG_CACHE_KEYS.vaultItems),
       nudges: nudges || [],
       captures: captures || [],
       loading: false
@@ -151,11 +191,16 @@ export const useStore = create((set, get) => ({
   // ── Ideas ─────────────────────────────────────────────────
   addIdea: async (idea) => {
     const { user, activeSpace } = get()
-    const { data, error } = await supabase.from('ideas').insert({
+    const payload = {
       ...normalizeIdea(idea),
       user_id: user.id,
       space_id: activeSpace?.id || null
-    }).select().single()
+    }
+    let { data, error } = await supabase.from('ideas').insert(payload).select().single()
+    if (error && isMissingTagsColumnError(error)) {
+      ;({ data, error } = await supabase.from('ideas').insert(stripTagsField(payload)).select().single())
+    }
+    if (!error && idea.tags !== undefined) cacheEntityTags(TAG_CACHE_KEYS.ideas, data?.id, idea.tags)
     if (!error) set((s) => ({ ideas: [data, ...s.ideas] }))
     return { data, error }
   },
@@ -211,11 +256,16 @@ export const useStore = create((set, get) => ({
   // ── Vault ─────────────────────────────────────────────────
   addVaultItem: async (item) => {
     const { user, activeSpace } = get()
-    const { data, error } = await supabase.from('vault_items').insert({
+    const payload = {
       ...normalizeVaultItem(item),
       user_id: user.id,
       space_id: activeSpace?.id || null
-    }).select().single()
+    }
+    let { data, error } = await supabase.from('vault_items').insert(payload).select().single()
+    if (error && isMissingTagsColumnError(error)) {
+      ;({ data, error } = await supabase.from('vault_items').insert(stripTagsField(payload)).select().single())
+    }
+    if (!error && item.tags !== undefined) cacheEntityTags(TAG_CACHE_KEYS.vaultItems, data?.id, item.tags)
     if (!error) set((s) => ({ vaultItems: [data, ...s.vaultItems] }))
     return { data, error }
   },
@@ -250,22 +300,40 @@ export const useStore = create((set, get) => ({
   },
   deleteIdea: async (id) => {
     const { error } = await supabase.from('ideas').delete().eq('id', id)
-    if (!error) set(s => ({ ideas: s.ideas.filter(i => i.id !== id) }))
+    if (!error) {
+      const cache = readTagCache(TAG_CACHE_KEYS.ideas)
+      delete cache[id]
+      writeTagCache(TAG_CACHE_KEYS.ideas, cache)
+      set(s => ({ ideas: s.ideas.filter(i => i.id !== id) }))
+    }
     return { error }
   },
   deleteVaultItem: async (id) => {
     const { error } = await supabase.from('vault_items').delete().eq('id', id)
-    if (!error) set(s => ({ vaultItems: s.vaultItems.filter(v => v.id !== id) }))
+    if (!error) {
+      const cache = readTagCache(TAG_CACHE_KEYS.vaultItems)
+      delete cache[id]
+      writeTagCache(TAG_CACHE_KEYS.vaultItems, cache)
+      set(s => ({ vaultItems: s.vaultItems.filter(v => v.id !== id) }))
+    }
     return { error }
   },
   updateVaultItem: async (id, updates) => {
     const cleaned = normalizeVaultItem(updates)
-    const { error } = await supabase.from('vault_items').update(cleaned).eq('id', id)
+    let { error } = await supabase.from('vault_items').update(cleaned).eq('id', id)
+    if (error && isMissingTagsColumnError(error)) {
+      ;({ error } = await supabase.from('vault_items').update(stripTagsField(cleaned)).eq('id', id))
+    }
+    if (!error && updates.tags !== undefined) cacheEntityTags(TAG_CACHE_KEYS.vaultItems, id, updates.tags)
     if (!error) set(s => ({ vaultItems: s.vaultItems.map(v => v.id === id ? { ...v, ...updates } : v) }))
     return { error }
   },
   updateIdea: async (id, updates) => {
-    const { error } = await supabase.from('ideas').update(updates).eq('id', id)
+    let { error } = await supabase.from('ideas').update(updates).eq('id', id)
+    if (error && isMissingTagsColumnError(error)) {
+      ;({ error } = await supabase.from('ideas').update(stripTagsField(updates)).eq('id', id))
+    }
+    if (!error && updates.tags !== undefined) cacheEntityTags(TAG_CACHE_KEYS.ideas, id, updates.tags)
     if (!error) set(s => ({ ideas: s.ideas.map(i => i.id === id ? { ...i, ...updates } : i) }))
     return { error }
   },
