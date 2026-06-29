@@ -36,6 +36,16 @@ const normalizeVaultItem = (item) => ({
 const normalizeExpense = (expense) =>
   pickKnown(expense, ['project_id', 'vault_item_id', 'vendor', 'amount', 'currency', 'category', 'date', 'notes'])
 
+const isMissingTaskColumnError = (error) => {
+  const message = `${error?.message || ''} ${error?.details || ''} ${error?.hint || ''}`.toLowerCase()
+  return message.includes('priority') || message.includes('reminder_at')
+}
+
+const stripTaskCompatFields = (task) => {
+  const { priority, reminder_at, ...rest } = task
+  return rest
+}
+
 export const useStore = create((set, get) => ({
   // ── Auth ──────────────────────────────────────────────────
   user: null,
@@ -114,18 +124,26 @@ export const useStore = create((set, get) => ({
   // ── Tasks ─────────────────────────────────────────────────
   addTask: async (task) => {
     const { user, activeSpace } = get()
-    const { data, error } = await supabase.from('tasks').insert({
+    const payload = {
       ...normalizeTask({ ...task, priority: task.priority || 'med' }),
       user_id: user.id,
       space_id: activeSpace?.id || null
-    }).select().single()
+    }
+    let { data, error } = await supabase.from('tasks').insert(payload).select().single()
+    if (error && isMissingTaskColumnError(error)) {
+      ;({ data, error } = await supabase.from('tasks').insert(stripTaskCompatFields(payload)).select().single())
+    }
     if (!error) set((s) => ({ tasks: [data, ...s.tasks] }))
     return { data, error }
   },
 
   updateTask: async (id, updates) => {
     const cleaned = normalizeTask(updates)
-    const { error } = await supabase.from('tasks').update({ ...cleaned, updated_at: new Date().toISOString() }).eq('id', id)
+    const payload = { ...cleaned, updated_at: new Date().toISOString() }
+    let { error } = await supabase.from('tasks').update(payload).eq('id', id)
+    if (error && isMissingTaskColumnError(error)) {
+      ;({ error } = await supabase.from('tasks').update(stripTaskCompatFields(payload)).eq('id', id))
+    }
     if (!error) set((s) => ({ tasks: s.tasks.map(t => t.id === id ? { ...t, ...cleaned } : t) }))
     return { error }
   },
