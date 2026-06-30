@@ -2,6 +2,8 @@ import { useState } from 'react'
 import { supabase } from '../lib/supabase'
 import { setLocalAdminSession } from '../lib/adminAccess'
 
+const APP_URL = import.meta.env.VITE_APP_URL || `${window.location.origin}/memora/`
+
 export default function Auth() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -19,7 +21,7 @@ export default function Auth() {
     setLoading(true)
     const { error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
-      options: { redirectTo: `${window.location.origin}/memora/` }
+      options: { redirectTo: APP_URL }
     })
     if (error) {
       setError(error.message)
@@ -32,8 +34,13 @@ export default function Auth() {
     setError('')
     setMessage('')
     setLoading(true)
-    const fn = mode === 'sign-in' ? 'signInWithPassword' : 'signUp'
-    const { error } = await supabase.auth[fn]({ email, password })
+    const { error } = mode === 'sign-in'
+      ? await supabase.auth.signInWithPassword({ email, password })
+      : await supabase.auth.signUp({
+          email,
+          password,
+          options: { emailRedirectTo: APP_URL }
+        })
     setLoading(false)
     if (error) setError(error.message)
     else if (mode === 'sign-up') setMessage('Account created. Check your email if confirmation is required.')
@@ -45,7 +52,7 @@ export default function Auth() {
     setMessage('')
     setLoading(true)
     const { error } = await supabase.auth.resetPasswordForEmail(email.trim(), {
-      redirectTo: `${window.location.origin}/memora/`
+      redirectTo: APP_URL
     })
     setLoading(false)
     if (error) setError(error.message)
@@ -58,7 +65,7 @@ export default function Auth() {
     setMessage('')
     if (adminId.trim() === 'admin' && adminPassword === 'admin1212') {
       setLocalAdminSession(true)
-      window.location.href = `${window.location.origin}/memora/admin`
+      window.location.href = `${APP_URL.replace(/\/$/, '')}/admin`
       return
     }
     setError('Invalid admin credentials.')
