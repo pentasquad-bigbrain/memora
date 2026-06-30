@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { useStore } from '../lib/store'
 import { supabase } from '../lib/supabase'
 import { showCaptureNotification } from '../lib/captureNotification'
-import { isSuperUser } from '../lib/adminAccess'
+import { isSuperUser, setLocalAdminSession } from '../lib/adminAccess'
 
 const AVATAR_COLORS = ['avatar-blue','avatar-green','avatar-purple','avatar-amber','avatar-red']
 function initials(name) { return name?.split(' ').map(n=>n[0]).join('').toUpperCase().slice(0,2)||'?' }
@@ -33,12 +33,15 @@ export default function Menu() {
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [aboutOpen, setAboutOpen] = useState(false)
   const [notifications, setNotifications] = useState(() => localStorage.getItem('memora-notifications') === 'on')
+  const [settingsMessage, setSettingsMessage] = useState('')
+  const [linkingGoogle, setLinkingGoogle] = useState(false)
   const [editName, setEditName] = useState(user?.user_metadata?.full_name || '')
   const [savingProfile, setSavingProfile] = useState(false)
 
   const firstName = user?.user_metadata?.full_name?.split(' ')[0] || 'there'
   const fullName  = user?.user_metadata?.full_name || firstName
   const email     = user?.email || ''
+  const googleLinked = user?.app_metadata?.provider === 'google' || user?.identities?.some(identity => identity.provider === 'google')
 
   const toggleTheme = () => {
     const next = theme === 'light' ? 'dark' : 'light'
@@ -55,8 +58,22 @@ export default function Menu() {
   }
 
   const handleLogout = async () => {
+    setLocalAdminSession(false)
     await supabase.auth.signOut()
     navigate('/')
+  }
+
+  const handleLinkGoogle = async () => {
+    setSettingsMessage('')
+    setLinkingGoogle(true)
+    const { error } = await supabase.auth.linkIdentity({
+      provider: 'google',
+      options: { redirectTo: `${window.location.origin}/memora/` }
+    })
+    if (error) {
+      setSettingsMessage(error.message)
+      setLinkingGoogle(false)
+    }
   }
 
   const toggleNotifications = async () => {
@@ -252,6 +269,25 @@ export default function Menu() {
               <button onClick={toggleNotifications} style={{ width:48, height:28, borderRadius:14, border:'none', background:notifications?'var(--accent)':'var(--border-strong)', position:'relative', cursor:'pointer' }}>
                 <div style={{ position:'absolute', top:4, left:notifications?24:4, width:20, height:20, borderRadius:'50%', background:'#fff', transition:'left .2s' }} />
               </button>
+            </div>
+            <div style={{ padding:'14px 0', borderBottom:'1px solid var(--border)' }}>
+              <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', gap:12 }}>
+                <div>
+                  <div style={{ fontSize:14, fontWeight:600 }}>Google sign-in</div>
+                  <div style={{ fontSize:12, color:'var(--muted)', marginTop:2 }}>
+                    {googleLinked ? 'Google is linked to this account' : 'Link Google to this existing email account'}
+                  </div>
+                </div>
+                <button
+                  onClick={handleLinkGoogle}
+                  disabled={googleLinked || linkingGoogle}
+                  style={{ padding:'9px 12px', borderRadius:'var(--r-sm)', border:'1px solid var(--border)', background:googleLinked?'var(--green-soft)':'var(--bg)', color:googleLinked?'var(--green-dark)':'var(--text)', cursor:googleLinked||linkingGoogle?'default':'pointer', fontFamily:'inherit', fontSize:12, fontWeight:700, display:'flex', alignItems:'center', gap:6, whiteSpace:'nowrap' }}
+                >
+                  <i className={`ti ${googleLinked ? 'ti-circle-check' : 'ti-brand-google'}`} />
+                  {googleLinked ? 'Linked' : linkingGoogle ? 'Opening...' : 'Link'}
+                </button>
+              </div>
+              {settingsMessage && <div style={{ fontSize:12, color:'var(--red-dark)', marginTop:8, lineHeight:1.4 }}>{settingsMessage}</div>}
             </div>
             <button className="btn btn-ghost" style={{ width:'100%', marginTop:16 }} onClick={()=>setSettingsOpen(false)}>Done</button>
           </div>
