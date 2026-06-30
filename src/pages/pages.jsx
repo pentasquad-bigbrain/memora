@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useMemo } from 'react'
 import { useStore } from '../lib/store'
 import { expandIdea, generateJournalSummary, brainstormIdeas, analyzeImage } from '../lib/groq'
+import { playMemoraChime } from '../lib/notificationSound'
 import { formatDistanceToNow, format, isToday, isYesterday } from 'date-fns'
 import Tesseract from 'tesseract.js'
 import { SkeletonVaultCard } from '../components/shared/Skeleton'
@@ -19,8 +20,9 @@ function scheduleReminder(title, reminderAt) {
   const delay = new Date(reminderAt) - Date.now()
   if (delay <= 0) return
   const go = () => new Notification('⏰ Memora Reminder', { body: title, icon: '/memora/icon-192.png' })
-  if (Notification.permission === 'granted') { setTimeout(go, Math.min(delay, 2147483647)); return }
-  Notification.requestPermission().then(p => { if (p === 'granted') setTimeout(go, Math.min(delay, 2147483647)) })
+  const ring = () => { playMemoraChime(); go() }
+  if (Notification.permission === 'granted') { setTimeout(ring, Math.min(delay, 2147483647)); return }
+  Notification.requestPermission().then(p => { if (p === 'granted') setTimeout(ring, Math.min(delay, 2147483647)) })
 }
 
 // ── Shared helpers ────────────────────────────────────────────

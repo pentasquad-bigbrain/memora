@@ -59,9 +59,15 @@ export default function App() {
         <Route path="/calendar" element={<Calendar />} />
         <Route path="*"        element={<Navigate to="/" />} />
       </Routes>
-      <BottomNav />
+      <AppChrome />
     </BrowserRouter>
   )
+}
+
+function AppChrome() {
+  const location = useLocation()
+  if (location.pathname.startsWith('/admin')) return null
+  return <BottomNav />
 }
 
 function hideSplash() {

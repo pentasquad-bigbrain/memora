@@ -2,6 +2,7 @@ import { useState, useRef, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { parseCapture, analyzeImage, simplifySpokenEnglish } from '../lib/groq'
 import { useStore } from '../lib/store'
+import { playMemoraChime } from '../lib/notificationSound'
 import { format } from 'date-fns'
 
 const TYPE_META = {
@@ -29,8 +30,9 @@ function scheduleReminder(title, reminderAt) {
   const delay = new Date(reminderAt) - Date.now()
   if (delay <= 0) return
   const go = () => new Notification('⏰ Memora Reminder', { body: title, icon: '/memora/icon-192.png' })
-  if (Notification.permission === 'granted') { setTimeout(go, Math.min(delay, 2147483647)); return }
-  Notification.requestPermission().then(p => { if (p === 'granted') setTimeout(go, Math.min(delay, 2147483647)) })
+  const ring = () => { playMemoraChime(); go() }
+  if (Notification.permission === 'granted') { setTimeout(ring, Math.min(delay, 2147483647)); return }
+  Notification.requestPermission().then(p => { if (p === 'granted') setTimeout(ring, Math.min(delay, 2147483647)) })
 }
 
 // Reusable tag chips + manual input

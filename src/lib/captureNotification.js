@@ -1,3 +1,5 @@
+import { playMemoraChime } from './notificationSound'
+
 const SW_PATH = '/memora/sw.js'
 
 export async function ensureCaptureWorker() {
@@ -15,6 +17,7 @@ export async function showCaptureNotification() {
   if (Notification.permission !== 'granted') return false
   const registration = await ensureCaptureWorker()
   if (!registration?.showNotification) return false
+  playMemoraChime()
   await registration.showNotification('Memora', {
     body: 'Capture it before you forget.',
     tag: 'memora-capture',
